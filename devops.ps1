@@ -1,52 +1,403 @@
-﻿# Dot-sourcing loads functions; paths are relative to this script, not the caller.
-# Each entry holds a file and its functions. A function map gives each action
-# a readable name, including when several functions belong to the same file.
-$modules = @(
-    @{ Path = 'src/Common/Input.ps1'; Functions = @{ ReadInput = 'Read-SSHSetupInput' } }
-    @{ Path = 'src/Common/Validation.ps1'; Functions = @{ ValidateInput = 'Test-SSHSetupInput' } }
-    @{ Path = 'src/SSH/SSHDetection.ps1'; Functions = @{ CheckClient = 'Test-SSHClient'; CheckKeygen = 'Test-SSHKeygen' } }
-    @{ Path = 'src/SSH/SSHKey.ps1'; Functions = @{ PrepareKey = 'New-SSHKey' } }
-    @{ Path = 'src/SSH/SSHKeyInstall.ps1'; Functions = @{ InstallKey = 'Install-SSHPublicKey' } }
-    @{ Path = 'src/SSH/SSHConfig.ps1'; Functions = @{ CheckConfig = 'Test-SSHConfig'; ConfigureAlias = 'New-SSHConfig' } }
-    @{ Path = 'src/SSH/SSHConnection.ps1'; Functions = @{ TestConnection = 'Test-SSHConnection' } }
+﻿# ============================================================
+# DevOps CLI - Main Application
+# T10: Interactive CLI Menu
+#
+# Compatible with Windows PowerShell 5.1.
+# ============================================================
+
+$ErrorActionPreference = "Stop"
+
+# STEP 1: Define the project paths.
+$projectRoot = $PSScriptRoot
+
+$configDirectory = Join-Path $projectRoot "src/SSH/Config"
+$connectionDirectory = Join-Path $projectRoot "src/SSH/Connection"
+$keyDirectory = Join-Path $projectRoot "src/SSH/Key"
+
+
+# STEP 2: Load an existing PowerShell function.
+function Import-DevOpsFunction {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath
+    )
+
+    if (-not (Test-Path -LiteralPath $FilePath -PathType Leaf)) {
+        throw "Required script was not found: $FilePath"
+    }
+
+    . $FilePath
+}
+
+
+# STEP 3: Load the SSH functions.
+#
+# Dot-sourcing inside this loader function would only load
+# functions into the loader's scope. Instead, load them at
+# script scope below.
+
+$scriptFiles = @(
+    (Join-Path $configDirectory "New-SSHConfig.ps1")
+    (Join-Path $configDirectory "Get-SSHConfig.ps1")
+    (Join-Path $configDirectory "Set-SSHConfig.ps1")
+    (Join-Path $configDirectory "Remove-SSHConfig.ps1")
+
+    (Join-Path $connectionDirectory "Test-SSHConnection.ps1")
+    (Join-Path $connectionDirectory "Connect-SSH.ps1")
+
+    (Join-Path $keyDirectory "Get-SSHKey.ps1")
+    (Join-Path $keyDirectory "New-SSHKey.ps1")
+    (Join-Path $keyDirectory "Test-SSHKey.ps1")
+    (Join-Path $keyDirectory "Install-SSHPublicKey.ps1")
 )
-try {
-    $commands = @{}
-    foreach ($module in $modules) {
-        # Load each file once, using the script's directory rather than the
-        # caller's directory. Loading defines functions without invoking them.
-        . (Join-Path $PSScriptRoot $module.Path)
-        foreach ($action in $module.Functions.GetEnumerator()) {
-            # GetEnumerator yields each key/value pair. Resolve functions now
-            # so an incorrect name fails before setup makes any changes.
-            if ($commands.ContainsKey($action.Key)) { throw "Duplicate setup action: $($action.Key)" }
-            $commands[$action.Key] = Get-Command -Name $action.Value -CommandType Function -ErrorAction Stop
+
+foreach ($file in $scriptFiles) {
+    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
+        throw "Required script was not found: $file"
+    }
+
+    . $file
+}
+
+
+# STEP 4: Define reusable UI functions.
+function Show-DevOpsHeader {
+    param(
+        [string]$Title = "DEVOPS CLI"
+    )
+
+    Clear-Host
+
+    Write-Host "========================================"
+    Write-Host "  $Title"
+    Write-Host "========================================"
+    Write-Host ""
+}
+
+
+function Wait-DevOpsInput {
+    Write-Host ""
+    Read-Host "Press Enter to continue" | Out-Null
+}
+
+
+function Invoke-DevOpsAction {
+    param(
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$Action
+    )
+
+    try {
+        & $Action
+    }
+    catch {
+        Write-Host ""
+        Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+    }
+
+    Wait-DevOpsInput
+}
+
+
+# STEP 5: SSH Configuration menu.
+function Show-SSHConfigMenu {
+
+    while ($true) {
+        Show-DevOpsHeader "SSH CONFIGURATION"
+
+        Write-Host "1. List SSH configurations"
+        Write-Host "2. Create SSH configuration"
+        Write-Host "3. Update SSH configuration"
+        Write-Host "4. Delete SSH configuration"
+        Write-Host "0. Back"
+        Write-Host ""
+
+        $choice = Read-Host "Select an option"
+
+        switch ($choice) {
+
+            "1" {
+                Invoke-DevOpsAction {
+                    Get-SSHConfig | Format-List
+                }
+            }
+
+            "2" {
+                Invoke-DevOpsAction {
+                    $aliasName = Read-Host "SSH alias"
+                    $hostName = Read-Host "HostName / IP address"
+                    $username = Read-Host "Ubuntu username"
+                    $portInput = Read-Host "SSH port (default: 22)"
+                    $identityFile = Read-Host "Identity file (optional)"
+
+                    $port = 22
+
+                    if (-not [string]::IsNullOrWhiteSpace($portInput)) {
+                        $port = [int]$portInput
+                    }
+
+                    $parameters = @{
+                        Alias    = $aliasName
+                        HostName = $hostName
+                        Username = $username
+                        Port     = $port
+                    }
+
+                    if (-not [string]::IsNullOrWhiteSpace($identityFile)) {
+                        $parameters.IdentityFile = $identityFile
+                    }
+
+                    New-SSHConfig @parameters
+                }
+            }
+
+            "3" {
+                Invoke-DevOpsAction {
+                    $aliasName = Read-Host "SSH alias to update"
+
+                    Write-Host ""
+                    Write-Host "Leave a field empty to keep its current value."
+                    Write-Host ""
+
+                    $hostName = Read-Host "New HostName"
+                    $username = Read-Host "New username"
+                    $portInput = Read-Host "New port"
+                    $identityFile = Read-Host "New identity file"
+
+                    $parameters = @{
+                        Alias = $aliasName
+                    }
+
+                    if (-not [string]::IsNullOrWhiteSpace($hostName)) {
+                        $parameters.HostName = $hostName
+                    }
+
+                    if (-not [string]::IsNullOrWhiteSpace($username)) {
+                        $parameters.Username = $username
+                    }
+
+                    if (-not [string]::IsNullOrWhiteSpace($portInput)) {
+                        $parameters.Port = [int]$portInput
+                    }
+
+                    if (-not [string]::IsNullOrWhiteSpace($identityFile)) {
+                        $parameters.IdentityFile = $identityFile
+                    }
+
+                    if ($parameters.Count -eq 1) {
+                        Write-Host "No changes requested."
+                    }
+                    else {
+                        Set-SSHConfig @parameters
+                    }
+                }
+            }
+
+            "4" {
+                Invoke-DevOpsAction {
+                    $aliasName = Read-Host "SSH alias to delete"
+
+                    Write-Host ""
+                    Write-Host "Previewing the deletion:"
+                    Remove-SSHConfig -Alias $aliasName -WhatIf
+
+                    Write-Host ""
+                    $confirm = Read-Host "Delete this alias? (yes/no)"
+
+                    if ($confirm -ceq "yes") {
+                        Remove-SSHConfig `
+                            -Alias $aliasName `
+                            -Confirm:$false
+                    }
+                    else {
+                        Write-Host "Deletion cancelled."
+                    }
+                }
+            }
+
+            "0" {
+                return
+            }
+
+            default {
+                Write-Host "Invalid option."
+                Wait-DevOpsInput
+            }
         }
     }
-    Write-Host '=== DevOps CLI ==='
-    # & invokes the function stored for an action. Keep workflow order explicit:
-    # checking config and writing config happen at different stages.
-    $values = & $commands.ReadInput
-    $null = & $commands.ValidateInput @values
-    if (-not (& $commands.CheckClient)) { throw 'Install OpenSSH client and make ssh available in PATH.' }
-    if (-not (& $commands.CheckKeygen)) { throw 'Install OpenSSH tools and make ssh-keygen available in PATH.' }
-    $sshPath = (Get-Command ssh -CommandType Application -ErrorAction Stop).Source
-    $keygenPath = (Get-Command ssh-keygen -CommandType Application -ErrorAction Stop).Source
-    $sshDirectory = Join-Path $HOME '.ssh'
-    $keyPath = Join-Path $sshDirectory 'id_ed25519'
-    $configPath = Join-Path $sshDirectory 'config'
-    # Find config conflicts before generating keys or contacting the server.
-    $null = & $commands.CheckConfig @values -KeyPath $keyPath -ConfigPath $configPath
-    $key = & $commands.PrepareKey -KeyPath $keyPath -KeygenPath $keygenPath
-    & $commands.InstallKey @values -PublicKeyPath $key.PublicKeyPath -SshPath $sshPath
-    $state = & $commands.ConfigureAlias @values -KeyPath $keyPath -ConfigPath $configPath
-    Write-Host "SSH configuration: $state"
-    $result = & $commands.TestConnection -Alias $values.Alias -SshPath $sshPath -ConfigPath $configPath
-    if (-not $result.Success) { throw $result.Message }
-    Write-Host "SSH connection successful. Remote user: $($result.RemoteUser)" -ForegroundColor Green
-    Write-Host "Setup completed. Connect using: ssh $($values.Alias)"
 }
-catch {
-    Write-Host "Setup failed: $($_.Exception.Message)" -ForegroundColor Red
-    exit 1
+
+
+# STEP 6: SSH Connection menu.
+function Show-SSHConnectionMenu {
+
+    while ($true) {
+        Show-DevOpsHeader "SSH CONNECTION"
+
+        Write-Host "1. Test SSH connection"
+        Write-Host "2. Connect to SSH server"
+        Write-Host "0. Back"
+        Write-Host ""
+
+        $choice = Read-Host "Select an option"
+
+        switch ($choice) {
+
+            "1" {
+                Invoke-DevOpsAction {
+                    $aliasName = Read-Host "SSH alias"
+
+                    Test-SSHConnection -Alias $aliasName |
+                        Format-List
+                }
+            }
+
+            "2" {
+                Invoke-DevOpsAction {
+                    $aliasName = Read-Host "SSH alias"
+
+                    Connect-SSH -Alias $aliasName
+                }
+            }
+
+            "0" {
+                return
+            }
+
+            default {
+                Write-Host "Invalid option."
+                Wait-DevOpsInput
+            }
+        }
+    }
 }
+
+
+# STEP 7: SSH Key Management menu.
+function Show-SSHKeyMenu {
+
+    while ($true) {
+        Show-DevOpsHeader "SSH KEY MANAGEMENT"
+
+        Write-Host "1. List SSH keys"
+        Write-Host "2. Generate ED25519 SSH key"
+        Write-Host "3. Validate SSH key pair"
+        Write-Host "4. Install public key on Ubuntu"
+        Write-Host "0. Back"
+        Write-Host ""
+
+        $choice = Read-Host "Select an option"
+
+        switch ($choice) {
+
+            "1" {
+                Invoke-DevOpsAction {
+                    Get-SSHKey | Format-List
+                }
+            }
+
+            "2" {
+                Invoke-DevOpsAction {
+                    $keyName = Read-Host "New key name"
+                    $comment = Read-Host "Key comment (optional)"
+
+                    $parameters = @{
+                        Name = $keyName
+                    }
+
+                    if (-not [string]::IsNullOrWhiteSpace($comment)) {
+                        $parameters.Comment = $comment
+                    }
+
+                    New-SSHKey @parameters | Format-List
+                }
+            }
+
+            "3" {
+                Invoke-DevOpsAction {
+                    $privateKeyPath = Read-Host "Private key path"
+
+                    Test-SSHKey `
+                        -PrivateKeyPath $privateKeyPath |
+                        Format-List
+                }
+            }
+
+            "4" {
+                Invoke-DevOpsAction {
+                    $aliasName = Read-Host "SSH alias"
+                    $publicKeyPath = Read-Host "Public key path"
+
+                    Write-Host ""
+                    Write-Host "This will modify authorized_keys on the server."
+                    $confirm = Read-Host "Continue? (yes/no)"
+
+                    if ($confirm -ceq "yes") {
+                        Install-SSHPublicKey `
+                            -Alias $aliasName `
+                            -PublicKeyPath $publicKeyPath |
+                            Format-List
+                    }
+                    else {
+                        Write-Host "Installation cancelled."
+                    }
+                }
+            }
+
+            "0" {
+                return
+            }
+
+            default {
+                Write-Host "Invalid option."
+                Wait-DevOpsInput
+            }
+        }
+    }
+}
+
+
+# STEP 8: Main application menu.
+function Start-DevOpsCLI {
+
+    while ($true) {
+        Show-DevOpsHeader "DEVOPS CLI"
+
+        Write-Host "1. SSH Configuration"
+        Write-Host "2. SSH Connection"
+        Write-Host "3. SSH Key Management"
+        Write-Host "0. Exit"
+        Write-Host ""
+
+        $choice = Read-Host "Select an option"
+
+        switch ($choice) {
+
+            "1" {
+                Show-SSHConfigMenu
+            }
+
+            "2" {
+                Show-SSHConnectionMenu
+            }
+
+            "3" {
+                Show-SSHKeyMenu
+            }
+
+            "0" {
+                Write-Host "Goodbye!"
+                return
+            }
+
+            default {
+                Write-Host "Invalid option."
+                Wait-DevOpsInput
+            }
+        }
+    }
+}
+
+
+# STEP 9: Start the application.
+Start-DevOpsCLI

@@ -1,228 +1,113 @@
 # Learning PowerShell through DevOps CLI
 
-Start with `devops.ps1` to see the workflow, then open one feature file at a
-time. These are ordinary scripts and functions, not classes or a framework.
-Examples below come from the implementation; running setup itself can change
-your SSH files and the remote account. Prefer the isolated tests for study.
+These notes use the current menu application. For complete workflows see the
+[user guide](user/README.md); for contracts see the
+[developer reference](developer/ssh-module.md). Running write examples changes
+real files, so prefer the isolated tests when studying behavior.
 
-## Variables, strings, and interaction
+## Variables, strings and paths
 
-PowerShell variable names begin with `$`. Assignment resembles many languages:
+Variables start with `$`. Single-quoted strings are literal; double-quoted
+strings expand variables. `Join-Path` combines paths. `$HOME` is an automatic
+variable for the current user's home, and `$PSScriptRoot` identifies the executing
+script's directory. Do not redefine `$HOME` or `$home`; names are case-insensitive.
 
 ```powershell
 $sshDirectory = Join-Path $HOME '.ssh'
-$publicPath = "$KeyPath.pub"
+$publicPath = Join-Path $sshDirectory 'ubuntu-dev.pub'
+Test-Path -LiteralPath $publicPath -PathType Leaf
 ```
 
-Double-quoted strings interpolate variables, like template strings in other
-languages. Single-quoted strings are literal. `$HOME` is the current user's
-home, independent of the current working directory. A subexpression expands
-an object's property inside a string:
+`-LiteralPath` treats wildcard characters as part of the filename. `Read-Host`
+returns text, not executable PowerShell; entering `$HOME` into a CLI path prompt
+does not evaluate it. `Write-Host` displays progress without returning a result
+object. In strings, use `$($object.Property)` to expand a property value.
+
+## Functions and dot-sourcing
+
+A feature file defines a function. A leading dot followed by a space loads that
+definition into the current scope:
 
 ```powershell
-Write-Host "SSH connection successful. Remote user: $($result.RemoteUser)"
+. ./src/SSH/Key/Test-SSHKey.ps1
+Get-Command Test-SSHKey -Syntax
+Get-Help Test-SSHKey -Full
 ```
 
-`Read-SSHSetupInput` uses `(Read-Host 'Enter the SSH alias').Trim()` to read a
-line and remove surrounding whitespace. `Read-Host` returns text; `Write-Host`
-displays user-facing progress. Neither setup nor the installer collects a
-password into a PowerShell variable: native SSH owns authentication prompts.
+The entry point dot-sources an explicit file list at script scope. Doing that
+inside a loader function would instead define functions in that loader's local
+scope. Do not recursively load all `src` files: the current tree includes a
+misplaced Pester test. Dot-sourcing `devops.ps1` itself starts the menu.
 
-## Decisions and comparisons
+`param` declares inputs; `[string]` and `[int]` constrain their types.
+`[Parameter(Mandatory=$true)]` requires input. `CmdletBinding` enables advanced
+function behavior; only functions with SupportsShouldProcess gain the usual
+WhatIf/Confirm workflow. The current removal function supports it, but the
+configuration updater does not.
 
-In `New-SSHKey`, these Booleans determine whether a key pair is complete:
+## Objects, hashtables and splatting
+
+Functions emit every uncaptured expression to the success stream. `return`
+emits a value and stops the function; it does not discard earlier output.
+`[pscustomobject]@{ ... }` creates a named-property result. `@{ ... }` alone is
+a hashtable. `@parameters` passes hashtable entries as named arguments:
 
 ```powershell
-$privateExists = Test-Path -LiteralPath $KeyPath
-$publicExists = Test-Path -LiteralPath $publicPath
-if ($privateExists -ne $publicExists) {
-    throw 'Incomplete SSH key pair: preserve the existing file and restore its matching partner before retrying.'
+$parameters = @{
+    Alias = 'ubuntu-dev'
+    TimeoutSeconds = 5
 }
+# After loading Test-SSHConnection, a call with @parameters performs a real TCP probe.
 ```
 
-`if` runs its block when the condition is true. `else` can supply the alternative:
-the project uses early returns and errors where an alternative branch would
-otherwise nest the workflow. `$true` and `$false` are Boolean constants.
-`-eq` means equal; `-ne` means unequal; `-not` reverses a Boolean. `-and` and
-`-or` combine conditions. Unlike JavaScript, `=` assigns rather than compares.
+The update menu builds a hashtable of only nonblank fields. The updater checks
+`PSBoundParameters.ContainsKey` so an omitted field stays unchanged. Use
+`Format-List` when presenting objects to people, not inside a reusable function.
+`$null = <command>` or `Out-Null` suppresses unwanted object output. Native
+`ssh-keygen` stdout can accompany `New-SSHKey`'s final metadata object.
 
-`-match` tests a regular expression. `-notmatch` rejects a match; `-cnotmatch`
-also makes the comparison case-sensitive. Most PowerShell string comparisons
-are case-insensitive by default; `-ceq` explicitly requires case equality.
-Validation uses `\A` and `\z` to anchor a pattern to the entire input so a
-newline cannot inject another SSH configuration directive.
+## Decisions and menu loops
 
-On a successful regex match, `$Matches` contains captured groups. Installation
-copies `$Matches[1]` into `$blob` before doing other operations, because later
-matches can replace this automatic variable.
+The menu uses `while ($true)` and `switch` on input text. `return` leaves a
+submenu; the main menu's return ends the application. `-eq` compares values,
+`-ne` means unequal, and `-not` negates a Boolean. `-ceq` compares strings with
+case sensitivity, which is why the confirmation prompt accepts exactly `yes`.
 
-## Paths and commands
+`-match` applies a regex and populates `$Matches`; another regex can replace that
+variable. The installer copies the algorithm/blob into a canonical public string
+before later work. `\A` and `\z` anchor a pattern to the entire string. Older
+validators in this tree use `^`/`$`; do not assume all functions share identical
+validation just because they use similar-looking patterns.
 
-`Join-Path` combines a directory and child name using platform path rules.
-`Test-Path` checks existence; `-PathType Leaf` requires a file rather than a
-directory. `-LiteralPath` prevents wildcard characters in actual filenames
-from being interpreted as search patterns.
+## Native programs, pipelines and errors
 
-```powershell
-if (-not (Test-Path -LiteralPath $directory)) {
-    $null = New-Item -ItemType Directory -Path $directory -ErrorAction Stop
-}
-```
+`Get-Command -CommandType Application` finds an executable. `&` invokes the path
+stored in a variable. PowerShell pipelines normally carry objects; native
+programs consume/produce text. Save `$LASTEXITCODE` immediately after a native
+invocation before another program can replace it.
 
-The `-not` avoids recreating an existing directory. Assigning to `$null`
-discards `New-Item`'s returned directory object so it does not become part of
-the calling function's output.
+`try/catch` catches terminating errors. `throw` creates one, and cmdlet
+`-ErrorAction Stop` promotes applicable errors. Native exit codes and stderr
+need separate handling, especially in Windows PowerShell 5.1 under Stop. The
+menu's action wrapper catches and prints errors, then waits for Enter; a caught
+action error does not establish a nonzero application exit code.
 
-`Test-SSHClient` uses `Get-Command ssh -CommandType Application` to search PATH.
-Application restricts discovery to executables, excluding PowerShell aliases
-and functions. `-ErrorAction SilentlyContinue` suppresses the usual missing
-command diagnostic so the function can return false. Setup then uses
-`-ErrorAction Stop` when resolving the actual executable path.
+The installer uses a literal single-quoted here-string for POSIX shell source,
+normalizes LF, and Base64-encodes it. Its outer command decodes into remote
+`sh -s`; it does not pipe the public line from a PowerShell text pipeline or use
+eval. A double-quoted here-string, used for configuration blocks, expands local
+PowerShell values. Do not confuse local PowerShell `$HOME` with the remote
+shell's HOME variable inside a literal script.
 
-## Functions, parameters, and output
+## Tests and current limits
 
-Feature files define functions without running the setup workflow. `param`
-declares inputs; `[string]` gives a type; `[Parameter(Mandatory=$true)]` requires
-a value. `[switch]` is a flag such as `-NonInteractive`.
+Pester 3.4.0 uses `Describe`, `It`, `Mock`, and assertions such as `Should Be`.
+Use TestDrive, test-owned variables, and fake native commands setting
+`LASTEXITCODE`; never use your real SSH configuration as a fixture. See
+[testing](developer/testing.md) for commands and current full-suite failures.
 
-```powershell
-$pair = New-SSHKey -KeyPath $keyPath -KeygenPath $keygenPath
-```
-
-Functions emit objects to PowerShell's success output stream. **Every
-uncaptured expression can be output**, even without `return`. `return`
-emits its value and stops that invocation; it does not discard earlier output.
-That differs from languages with a single return-value slot. This is why
-native keygen progress is sent to `Out-Host` and helper results to `$null`.
-
-`New-SSHKey` returns one object containing related results:
-
-```powershell
-return [pscustomobject]@{ KeyPath = $KeyPath; PublicKeyPath = $publicPath; Created = $created }
-```
-
-`@{ ... }` alone is a hashtable, similar to a dictionary. Input collection
-returns one so setup can use `& $commands.ValidateInput @values`. This is **splatting**:
-the keys `Server`, `Username`, and `Alias` become named arguments. Dependencies
-remain explicit, without globals shared across feature scripts.
-
-Every public function includes comment-based help with `.SYNOPSIS`, real
-parameters, outputs, and examples. After loading a file, try:
-
-```powershell
-. ./src/SSH/SSHDetection.ps1
-Get-Help Test-SSHClient -Full
-```
-
-## Dot-sourcing and script location
-
-Setup loads scripts with a leading dot followed by a space:
-
-```powershell
-. (Join-Path $PSScriptRoot $module.Path)
-```
-
-Dot-sourcing evaluates definitions in the caller's scope, so setup can call
-those functions. Running a script normally gives it its own script scope.
-`$PSScriptRoot` is the containing script's directory, not the terminal's current
-directory. This makes the launcher work from elsewhere. `@(...)` makes an array;
-setup loops over the list with `foreach`.
-
-Setup's `$modules` array stores each file's `Path` and a `Functions` hashtable.
-A file can provide more than one function:
-
-```powershell
-@{ Path = 'src/SSH/SSHDetection.ps1'; Functions = @{ CheckClient = 'Test-SSHClient'; CheckKeygen = 'Test-SSHKeygen' } }
-```
-
-The loader dot-sources each file once and uses `Get-Command -CommandType Function`
-to resolve its function names into `$commands`. `GetEnumerator()` loops over
-the function map's key/value pairs. The workflow then calls an action using
-`& $commands.CheckClient`. The function names live in the array, while the
-workflow explicitly controls parameters, results, and execution order. Loading
-all functions from a file does not mean they should all run immediately.
-
-## Files and preserving content
-
-`Get-Content -LiteralPath $PublicKeyPath -Raw` reads the whole file as one
-string. Without `-Raw`, it emits individual lines. `Trim()` removes surrounding
-whitespace before validating the public key.
-
-The duplicate-alias test uses:
-
-```powershell
-Add-Content $config "`nHost WORK`n HostName other"
-```
-
-`Add-Content` appends text; the backtick escape `` `n `` is a newline. Encoding
-defaults differ between Windows PowerShell and modern PowerShell. Production
-config writing therefore uses the .NET method
-`[System.IO.File]::AppendAllText` with an explicit UTF-8 encoding without a BOM.
-This appends bytes without re-encoding the original file. Existing files are
-first checked for compatible encoding. `[Type]::Method(...)` calls a static
-.NET method, similar to static methods in C# or Java.
-
-## Pipelines, the call operator, and native programs
-
-`|` passes output into the next command. PowerShell commands normally exchange
-objects; native applications receive text via their standard input. Installation
-uses this distinction deliberately:
-
-```powershell
-$publicKey | & $SshPath -T -o StrictHostKeyChecking=ask -o "HostName=$Server" -p 22 -o ConnectTimeout=10 -o ConnectionAttempts=1 -l $Username $Server $remoteCommand | Out-Host
-```
-
-`&` is the call operator. A string variable containing an executable path does
-not run by itself; `& $SshPath` invokes it. Separate arguments preserve paths
-with spaces without building and evaluating a PowerShell command string.
-`-o` here belongs to SSH, not PowerShell. The key travels as input data, never
-as interpolated remote shell source.
-
-Native argument passing differs across versions. Windows PowerShell 5.1 uses
-legacy Windows quoting; installation explicitly escapes embedded double quotes
-in the remote command for this case. PowerShell 7 on Linux passes argument
-strings directly. The remote command removes carriage returns from piped input
-because Windows text pipelines can send CRLF instead of LF.
-
-`$LASTEXITCODE` records the most recent native process exit code. Zero normally
-means success. Save it immediately, as `Test-SSHConnection` does, before another
-native command can replace it. Native nonzero exits do not normally throw a
-PowerShell exception, so `try/catch` alone cannot detect SSH failure.
-
-## Errors and workflow control
-
-```powershell
-if ($LASTEXITCODE -ne 0) { throw 'SSH key generation failed. Inspect partial files before retrying.' }
-```
-
-`throw` raises a terminating error. `try` contains work that may fail; `catch`
-handles terminating errors, similar to exception handling in other languages.
-`$_` inside `catch` is the error record; `$_.Exception.Message` is its message.
-`-ErrorAction Stop` converts cmdlet errors into terminating errors.
-
-Helpers throw or return structured results, while `devops.ps1` alone uses
-`exit 1` to signal failure to the invoking shell. Alias reuse returns `Reused`;
-it does not exit the entry script or skip connection testing. Failed connection
-tests return an object so callers can inspect `Success`, `ExitCode`, and
-`Message` without parsing colored console text.
-
-## Here-strings and two different languages
-
-Installation's remote command is a single-quoted here-string: it starts with
-`@'` and ends with `'@` on its own line. It holds multiple lines literally,
-including POSIX `$HOME` and `$key` variables that only the remote shell expands.
-Configuration generation uses a double-quoted here-string, starting with
-`@"` and ending with `"@`, so PowerShell expands `$Alias` and `$identity` locally.
-
-The remote snippet uses POSIX shell syntax, not PowerShell. Keep the two
-languages separate: local PowerShell validates inputs and invokes SSH, while
-remote shell commands preserve permissions and append the key on Linux.
-
-## Testing without touching your keys
-
-Tests use Pester's `Describe` and `It` blocks to describe expected behavior.
-`Mock Get-Command` simulates installed/missing tools. Local fake functions
-simulate native commands and their exit codes. Temporary key/config paths
-exercise preservation without touching `$HOME/.ssh`. The optional POSIX test
-runs the extracted installer script locally with an isolated HOME; it is not
-proof of SSH connectivity. Live validation is a separate, explicit manual step.
+PowerShell text encoding defaults differ by version. Creation uses Add-Content
+defaults; update/delete explicitly use UTF-8 and backups. The listing parser and
+TCP probe also have different purposes from OpenSSH's own effective config and
+authentication. Follow each function's current contract rather than older
+setup-wizard examples using removed flat-file APIs.
