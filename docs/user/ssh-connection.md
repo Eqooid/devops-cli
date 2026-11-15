@@ -7,7 +7,7 @@ OpenSSH's effective settings for that alias, including its port and identity.
 
 ## Check reachability
 
-Choose **2 > 1** and enter the alias. The function runs `ssh -G`, resolves the
+Choose **3 > 1** and enter the alias. The function runs `ssh -G`, resolves the
 configured HostName/Port, and tries a TCP connection with a five-second wait.
 It does not open an SSH login or verify host fingerprints, credentials, the
 SSH protocol, or forwarding/jump-host access.
@@ -35,7 +35,7 @@ alias that needs ProxyJump/ProxyCommand because it probes the target directly.
 
 ## Open a session
 
-Choose **2 > 2**, enter the alias, and follow OpenSSH's prompts. The function
+Choose **3 > 2**, enter the alias, and follow OpenSSH's prompts. The function
 checks `ssh -G` before invoking `ssh <alias>` interactively.
 
 ```powershell

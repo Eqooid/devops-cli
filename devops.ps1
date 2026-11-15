@@ -5,6 +5,8 @@
 # Compatible with Windows PowerShell 5.1.
 # ============================================================
 
+param([string]$Command, [string]$Action)
+
 $ErrorActionPreference = "Stop"
 
 # STEP 1: Define the project paths.
@@ -49,6 +51,7 @@ $scriptFiles = @(
     (Join-Path $keyDirectory "New-SSHKey.ps1")
     (Join-Path $keyDirectory "Test-SSHKey.ps1")
     (Join-Path $keyDirectory "Install-SSHPublicKey.ps1")
+    (Join-Path $projectRoot "src/SSH/Setup/Start-SSHQuickSetup.ps1")
 )
 
 foreach ($file in $scriptFiles) {
@@ -363,9 +366,10 @@ function Start-DevOpsCLI {
     while ($true) {
         Show-DevOpsHeader "DEVOPS CLI"
 
-        Write-Host "1. SSH Configuration"
-        Write-Host "2. SSH Connection"
-        Write-Host "3. SSH Key Management"
+        Write-Host "1. SSH Quick Setup"
+        Write-Host "2. SSH Configuration"
+        Write-Host "3. SSH Connection"
+        Write-Host "4. SSH Key Management"
         Write-Host "0. Exit"
         Write-Host ""
 
@@ -374,14 +378,18 @@ function Start-DevOpsCLI {
         switch ($choice) {
 
             "1" {
-                Show-SSHConfigMenu
+                Invoke-DevOpsAction { Start-SSHQuickSetup | Format-List }
             }
 
             "2" {
-                Show-SSHConnectionMenu
+                Show-SSHConfigMenu
             }
 
             "3" {
+                Show-SSHConnectionMenu
+            }
+
+            "4" {
                 Show-SSHKeyMenu
             }
 
@@ -400,4 +408,17 @@ function Start-DevOpsCLI {
 
 
 # STEP 9: Start the application.
-Start-DevOpsCLI
+if ($MyInvocation.InvocationName -ne '.') {
+    if ($Command -eq 'ssh' -and $Action -eq 'setup' -and $args.Count -eq 0) {
+        $result = Start-SSHQuickSetup
+        $result | Format-List
+        if ($result.Success) { exit 0 }
+        if ($result.Status -eq 'Cancelled') { exit 2 }
+        exit 1
+    }
+    elseif ($Command -or $Action -or $args.Count -gt 0) {
+        Write-Host 'Usage: .\devops.ps1 [ssh setup]' -ForegroundColor Red
+        exit 1
+    }
+    else { Start-DevOpsCLI }
+}

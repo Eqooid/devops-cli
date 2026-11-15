@@ -25,10 +25,10 @@ check that the identity file exists or that the server accepts it when saving.
 
 ## Create and read
 
-Choose **1 > 2** from the main menu and provide the fields. Creation makes
+Choose **2 > 2** from the main menu and provide the fields. Creation makes
 `.ssh` and `config` if missing, refuses an existing alias, and appends a new
 block. It makes no automatic backup and does not validate the result with
-`ssh -G`. List saved entries with **1 > 1**.
+`ssh -G`. List saved entries with **2 > 1**.
 
 Equivalent PowerShell commands, from the repository root, modify your real config:
 
@@ -48,7 +48,7 @@ the list function; an empty result can also mean no supported blocks were found.
 
 ## Update
 
-Choose **1 > 3**, enter the alias, then enter only the fields to change. Empty
+Choose **2 > 3**, enter the alias, then enter only the fields to change. Empty
 fields keep their current values. If every field is empty, the menu reports
 **No changes requested.** The alias itself cannot be renamed through this action.
 
@@ -66,7 +66,7 @@ Existing line endings are retained; update/delete output removes the BOM.
 
 ## Delete
 
-Choose **1 > 4** and enter an alias. The menu previews with `-WhatIf`, then asks
+Choose **2 > 4** and enter an alias. The menu previews with `-WhatIf`, then asks
 **Delete this alias? (yes/no)**. Only exactly lowercase `yes` performs deletion.
 It removes the whole selected Host block through the next Host declaration,
 including comments within that block. It never deletes a private key, a public

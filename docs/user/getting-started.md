@@ -11,9 +11,10 @@ Start from the repository directory:
 The main menu displays:
 
 ```text
-1. SSH Configuration
-2. SSH Connection
-3. SSH Key Management
+1. SSH Quick Setup
+2. SSH Configuration
+3. SSH Connection
+4. SSH Key Management
 0. Exit
 
 Select an option: 1
@@ -38,11 +39,11 @@ the CLI asks. Avoid interrupting a configuration write or key installation.
 
 ## First-use walkthrough
 
-1. Choose **3**, then **2**. Enter key name `ubuntu-dev`. An optional comment
+1. Choose **4**, then **2**. Enter key name `ubuntu-dev`. An optional comment
    labels the public key. `ssh-keygen` prompts for a passphrase and confirmation.
    It creates `$HOME/.ssh/ubuntu-dev` and `$HOME/.ssh/ubuntu-dev.pub`. If either
    already exists, generation stops; choose another name instead of deleting it.
-2. Return with **0**, choose **1**, then **2** to create a configuration:
+2. Return with **0**, choose **2**, then **2** to create a configuration:
 
    ```text
    SSH alias: ubuntu-dev
@@ -58,14 +59,14 @@ the CLI asks. Avoid interrupting a configuration write or key installation.
    prompt enter plain text without surrounding quotes. Use an absolute local
    path if needed. `~` in `IdentityFile` is expanded by OpenSSH; ordinary path
    prompts do not expand literal `$HOME` text.
-3. List configurations with **1 > 1**. Use **2 > 1** to check TCP reachability.
+3. List configurations with **2 > 1**. Use **3 > 1** to check TCP reachability.
    `Reachable : True` means the port accepted a TCP connection, not that login
    or the key works.
-4. Choose **3 > 4**. Enter alias `ubuntu-dev` and the full local path ending in
+4. Choose **4 > 4**. Enter alias `ubuntu-dev` and the full local path ending in
    `ubuntu-dev.pub`. Type exactly lowercase `yes` to authorize the remote change.
    Verify a first-time host fingerprint, then authenticate using an existing
    method. Expect `Status : INSTALLED` or `ALREADY_INSTALLED`.
-5. Choose **2 > 2**, enter `ubuntu-dev`, and log in. Follow
+5. Choose **3 > 2**, enter `ubuntu-dev`, and log in. Follow
    [key-only login verification](ssh-key-management.md#verify-key-based-login)
    to prove password fallback is not masking an incorrect key.
 
@@ -75,4 +76,4 @@ an earlier configuration or installed public key.
 
 For command-line function examples, follow [configuration](ssh-configuration.md),
 [connections](ssh-connection.md), and [key management](ssh-key-management.md).
-The menu script has no documented command-line flags or subcommands.
+For the guided workflow, choose main menu **1** or run `.\devops.ps1 ssh setup`. See [SSH Quick Setup](ssh-quick-setup.md).

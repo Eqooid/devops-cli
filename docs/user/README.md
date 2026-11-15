@@ -6,6 +6,8 @@ the server or the Ubuntu account.
 
 Read these pages in order for your first connection:
 
+Start with [SSH Quick Setup](ssh-quick-setup.md) for the guided one-command workflow.
+
 1. [Installation](installation.md): client tools and Ubuntu prerequisites.
 2. [Getting started](getting-started.md): menus and a first-use walkthrough.
 3. [SSH configuration](ssh-configuration.md): save a server under an alias.

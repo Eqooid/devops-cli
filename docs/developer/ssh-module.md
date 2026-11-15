@@ -272,13 +272,16 @@ Source: [Key/Install-SSHPublicKey.ps1](../../src/SSH/Key/Install-SSHPublicKey.ps
 Installs public material through an existing SSH alias.
 
 ```text
-Install-SSHPublicKey -Alias <string> -PublicKeyPath <string>
+Install-SSHPublicKey -Alias <string> -PublicKeyPath <string> [-InteractiveAuthentication]
 ```
 
 - Both parameters required; neither has a default. Alias is anchored with
   `\A[a-zA-Z0-9][a-zA-Z0-9_-]*\z`. File must have `.pub` extension, exist,
   contain one supported algorithm/Base64 line, and pass `ssh-keygen -l -f`.
   Algorithms: ssh-ed25519, ssh-rsa, ecdsa-sha2-nistp256/384/521.
+- Optional `InteractiveAuthentication` forces `BatchMode=no`,
+  `StrictHostKeyChecking=ask`, and `ConnectTimeout=10` for Quick Setup. Omission
+  preserves existing call behavior.
 - Output: one object with `Alias`, resolved `PublicKeyPath`,
   `Status='INSTALLED'` or `'ALREADY_INSTALLED'`, `Success=$true`. No failure
   object is returned. Startup output is verbose; successful stderr is a warning.
@@ -305,6 +308,15 @@ Install-SSHPublicKey -Alias <string> -PublicKeyPath <string>
 . ./src/SSH/Key/Install-SSHPublicKey.ps1
 Install-SSHPublicKey -Alias ubuntu-dev -PublicKeyPath (Join-Path $HOME '.ssh/ubuntu-dev.pub')
 ```
+
+## Start-SSHQuickSetup
+
+Source: [Setup/Start-SSHQuickSetup.ps1](../../src/SSH/Setup/Start-SSHQuickSetup.ps1).
+No parameters. Interactive orchestration returning `Status`, `Success`, `Alias`,
+`CompletedSteps`, `FailedStep`, and `Error`. Mutations require plan confirmation.
+See [wizard architecture](ssh-quick-setup.md) and the
+[user workflow](../user/ssh-quick-setup.md) for validation, authentication,
+retry behavior, and supported configuration limits.
 
 ## Legacy Common helpers
 

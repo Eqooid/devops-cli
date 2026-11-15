@@ -37,7 +37,7 @@ Get-Help Test-SSHKey -Full
 The entry point dot-sources an explicit file list at script scope. Doing that
 inside a loader function would instead define functions in that loader's local
 scope. Do not recursively load all `src` files: the current tree includes a
-misplaced Pester test. Dot-sourcing `devops.ps1` itself starts the menu.
+misplaced Pester test. Dot-sourcing `devops.ps1` loads definitions without starting the menu.
 
 `param` declares inputs; `[string]` and `[int]` constrain their types.
 `[Parameter(Mandatory=$true)]` requires input. `CmdletBinding` enables advanced

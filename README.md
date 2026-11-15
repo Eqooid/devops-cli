@@ -5,6 +5,7 @@ keys. It uses the installed OpenSSH tools and an existing Ubuntu account.
 
 ## Implemented features
 
+- SSH Quick Setup: one guided command to configure, install, and verify key login.
 - List, create, update, and delete simple SSH configuration entries.
 - Back up configuration before updates and deletion; preview deletion.
 - Check TCP reachability and open an interactive SSH session.
@@ -40,9 +41,15 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\devops.ps1
 
 ## Basic use
 
-Choose **3 > 2** to generate a named key, **1 > 2** to create an alias referencing
-its private file, then **3 > 4** to install its `.pub` file through that alias.
-Choose **2 > 2** to connect. Submenus use **0** to return; the main menu uses
+Choose **1** for [SSH Quick Setup](docs/user/ssh-quick-setup.md), or run:
+
+```powershell
+.\devops.ps1 ssh setup
+```
+
+For individual actions, choose **4 > 2** to generate a key, **2 > 2** to create
+an alias, and **4 > 4** to install its public key. Choose **3 > 2** to connect.
+Submenus use **0** to return; the main menu uses
 **0** to exit. The connection test checks TCP only; it does not verify login.
 
 ## Documentation

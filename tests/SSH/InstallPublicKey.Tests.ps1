@@ -76,6 +76,14 @@ public class SSHInstallProbe {
         $received[1] | Should Be work
         $received[2] | Should Match "\Aprintf '%s' '[A-Za-z0-9+/=]+' \| base64 -d \| sh -s\z"
     }
+    It 'can explicitly preserve interactive authentication and fingerprint checking for setup' {
+        (Install-SSHPublicKey -Alias work -PublicKeyPath $pub -InteractiveAuthentication).Success | Should Be $true
+        $received = [IO.File]::ReadAllLines($script:probePath + '.args')
+        ($received[0..5] -join '|') | Should Be '-o|BatchMode=no|-o|StrictHostKeyChecking=ask|-o|ConnectTimeout=10'
+        $received[6] | Should Be '-T'
+        $received[7] | Should Be work
+        $received.Count | Should Be 9
+    }
     It 'returns ALREADY_INSTALLED and tolerates startup banners' {
         [IO.File]::WriteAllText($script:probePath + '.stdout', "Welcome`n_='/usr/bin/sh'`nDEVOPS_CLI_STATUS:ALREADY_INSTALLED`n")
         (Install-SSHPublicKey -Alias work -PublicKeyPath $pub).Status | Should Be ALREADY_INSTALLED

@@ -2,7 +2,9 @@
 
 This project uses ordinary dot-sourced PowerShell functions, not a packaged
 module or a command-dispatch framework. Read the current source alongside these
-guides; the old setup-wizard API is no longer present in `src/SSH`.
+guides; the current setup wizard orchestrates the existing feature functions.
+
+- [SSH Quick Setup](ssh-quick-setup.md): orchestration, authentication, and tests.
 
 - [Architecture](architecture.md): entry point, menus, loading, data flow, errors.
 - [Project structure](project-structure.md): source, tests, and existing artifacts.

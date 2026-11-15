@@ -9,10 +9,10 @@ the launcher's directory, preserves its process exit code, and pauses. It does
 not select PowerShell 7, change execution policy, or interpret menu actions.
 
 `devops.ps1` sets `ErrorActionPreference` to `Stop`, builds paths using
-`PSScriptRoot`, verifies ten named feature scripts exist, and dot-sources them
-at script scope. It then defines the UI functions and calls `Start-DevOpsCLI`.
-Invoking or dot-sourcing this entry point starts the menu immediately; use
-individual feature scripts when you only want function definitions.
+`PSScriptRoot`, verifies eleven named feature scripts exist, and dot-sources them
+at script scope. Direct invocation starts `Start-DevOpsCLI`, or dispatches
+`ssh setup` to `Start-SSHQuickSetup`. Dot-sourcing loads definitions without
+starting either workflow. See [Quick Setup](ssh-quick-setup.md) for its contract.
 
 `Import-DevOpsFunction` is defined but unused. Its inner dot-source would load
 definitions only into the loader function's scope. The actual explicit
@@ -22,8 +22,11 @@ automatic export registry, dependency container, or plugin API.
 ```mermaid
 flowchart TD
     BAT[run.bat] --> ENTRY[devops.ps1]
-    ENTRY --> LOAD[Check and dot-source ten feature files]
+    ENTRY --> LOAD[Check and dot-source eleven feature files]
     LOAD --> MAIN[Start-DevOpsCLI]
+    LOAD --> COMMAND[ssh setup]
+    COMMAND --> SETUP[Start-SSHQuickSetup]
+    MAIN --> SETUP
     MAIN --> CONFIG[Show-SSHConfigMenu]
     MAIN --> CONNECTION[Show-SSHConnectionMenu]
     MAIN --> KEY[Show-SSHKeyMenu]
@@ -58,8 +61,10 @@ path. Public-key installation has a separate exact `yes` confirmation. Commands
 return structured objects where implemented, and the menu renders them with
 `Format-List`. Formatting belongs in the UI; preserve object output for callers.
 
-There is no automatic end-to-end setup transaction. Generating a key, creating
-an alias, installing it remotely, and logging in are independent user actions.
+Quick Setup automates key selection/generation, config creation/reuse, initial
+login, public-key installation, and key-only verification after plan confirmation.
+It preserves completed work on failure; it is not a rollback transaction.
+The individual key, config, and connection actions remain available.
 The Common setup-input helpers remain in the repository but are not loaded by
 this menu entry point.
 

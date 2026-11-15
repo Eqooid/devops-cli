@@ -15,6 +15,8 @@ devops-cli/
       Input.ps1
       Validation.ps1
     SSH/
+      Setup/
+        Start-SSHQuickSetup.ps1
       Config/
         New-SSHConfig.ps1
         Get-SSHConfig.ps1
@@ -37,6 +39,8 @@ devops-cli/
       SSH.Tests.ps1
       RemoteInstall.Tests.ps1
       InstallPublicKey.Tests.ps1
+      Setup/
+        SSHQuickSetup.Tests.ps1
       Config/
         SSHConfig.Tests.ps1
         SSHConfig.Integration.Tests.ps1
@@ -54,6 +58,7 @@ devops-cli/
 | Path | Responsibility |
 | --- | --- |
 | `devops.ps1` | Explicit function loading, menu rendering, prompts, action error wrapper |
+| `src/SSH/Setup/Start-SSHQuickSetup.ps1` | Shared confirmed setup workflow and constrained key verification |
 | `run.bat` | Windows PowerShell launcher and pause |
 | `src/Common/Input.ps1` | Legacy `Read-SSHSetupInput`, returns Server/Username/Alias hashtable; unused by current menus |
 | `src/Common/Validation.ps1` | Legacy `Test-SSHSetupInput`, validates that setup hashtable; unused by current menus |

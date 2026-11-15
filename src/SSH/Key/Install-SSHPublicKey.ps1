@@ -15,7 +15,10 @@ function Install-SSHPublicKey {
         [string]$Alias,
 
         [Parameter(Mandatory = $true)]
-        [string]$PublicKeyPath
+        [string]$PublicKeyPath,
+
+        # Override inherited noninteractive/trust settings only when explicitly requested.
+        [switch]$InteractiveAuthentication
     )
 
     # Refuse an accidentally selected private key before reading any contents.
@@ -121,7 +124,11 @@ fi
         $remoteCommand = "printf '%s' '$encodedScript' | base64 -d | sh -s"
         $ErrorActionPreference = 'Continue'
         $global:LASTEXITCODE = $null
-        $output = @(& $ssh.Source -T $Alias $remoteCommand 2> $diagnosticPath)
+        $authenticationOptions = @()
+        if ($InteractiveAuthentication) {
+            $authenticationOptions = @('-o', 'BatchMode=no', '-o', 'StrictHostKeyChecking=ask', '-o', 'ConnectTimeout=10')
+        }
+        $output = @(& $ssh.Source @authenticationOptions -T $Alias $remoteCommand 2> $diagnosticPath)
         $exitCode = $LASTEXITCODE
         $ErrorActionPreference = $savedErrorActionPreference
         $diagnostics = [IO.File]::ReadAllText($diagnosticPath).Trim()

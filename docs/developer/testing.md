@@ -2,6 +2,40 @@
 
 [Developer guide](README.md)
 
+## T12 Quick Setup verification
+
+Executed on 2026-11-15 with Windows PowerShell 5.1 and Pester 3.4.0,
+using fresh processes for isolated suites:
+
+| Invocation | Passed | Failed | Skipped | Total |
+| --- | --- | --- | --- | --- |
+| `tests/SSH/Setup/SSHQuickSetup.Tests.ps1` | 29 | 0 | 0 | 29 |
+| `tests/SSH/Config` | 14 | 0 | 0 | 14 |
+| `tests/SSH/Key/SSHKey.Tests.ps1` | 19 | 0 | 0 | 19 |
+| `tests/SSH/InstallPublicKey.Tests.ps1` | 25 | 0 | 0 | 25 |
+| Legacy `SSH.Tests.ps1` and `RemoteInstall.Tests.ps1` | 0 | 2 | 0 | 2 |
+| Full `tests` invocation | 6 | 10 | 0 | 16 |
+
+The full invocation is still broken by existing nested test discovery and deleted
+flat-file imports; its totals do not represent every intended test. Isolated
+feature suites pass 87 tests. The two legacy discovery failures refer to deleted
+`SSHDetection.ps1` and `SSHKeyInstall.ps1`. These unrelated tests were not rewritten.
+
+Quick Setup tests mock all network and key/config mutation boundaries, substitute
+a TestDrive home in in-memory functions, and use Pester 3 assertions and mock
+scopes. A native executable recorder checks Windows argument boundaries and
+exit handling; its expected permission-denied diagnostic is simulated. Child
+processes verify real command cancellation (exit 2) and launcher dispatch with a
+stub wizard for success/failure (exits 0/1). Menu tests exercise all four choices.
+The installer adds an argv test for its optional interactive authentication mode.
+
+The 5.1 parser accepted all 24 source/test/entry scripts. All 97 relative file
+links and Markdown heading targets resolved, 52 documentation PowerShell blocks parsed, and `git diff --check`
+passed. No live Ubuntu login, real key generation, or passphrase/agent acceptance
+was performed. Follow the [manual acceptance steps](../user/ssh-quick-setup.md#manual-end-to-end-acceptance)
+before treating the feature as live verified. This task remains
+**PARTIAL — VERIFICATION REQUIRED**.
+
 ## Pester 3.4.0 commands
 
 Run from the checkout root in Windows PowerShell 5.1. Select the installed

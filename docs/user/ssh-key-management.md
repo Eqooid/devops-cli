@@ -9,7 +9,7 @@ are authorized to access. A fingerprint is a short identifier for a key.
 
 ## Generate ED25519 keys
 
-Choose **3 > 2**. Enter a simple name such as `ubuntu-dev` and an optional comment.
+Choose **4 > 2**. Enter a simple name such as `ubuntu-dev` and an optional comment.
 The name starts with a letter/digit and contains only letters, digits, `_`, or
 `-`. A blank comment uses the name. OpenSSH prompts for a passphrase; choose one
 appropriate to how you protect and use the computer.
@@ -34,12 +34,12 @@ New-SSHKey -Name ubuntu-dev -Comment 'Ubuntu development access' | Format-List
 
 ## List and validate
 
-Choose **3 > 1** to list `.pub` files, types, fingerprints, sizes, paths, and
+Choose **4 > 1** to list `.pub` files, types, fingerprints, sizes, paths, and
 whether a matching private filename exists. Listing does not read private
 contents or prove the two keys match. Unreadable public fingerprints are warned
 about and skipped.
 
-Choose **3 > 3** to validate a pair. Enter the full path to the **private** file;
+Choose **4 > 3** to validate a pair. Enter the full path to the **private** file;
 the function expects its public partner at the same path plus `.pub`. OpenSSH
 derives the public key locally from the private key and may prompt for its
 passphrase. The comparison ignores comments and checks algorithm/key material.
@@ -60,7 +60,7 @@ repair a pair or prove that the server authorizes it.
 
 First [create an alias](ssh-configuration.md) using
 `IdentityFile ~/.ssh/ubuntu-dev`. You must already be able to authenticate to
-that account with a password or another key. Choose **3 > 4**, enter the alias
+that account with a password or another key. Choose **4 > 4**, enter the alias
 and full `.pub` path, and type exactly `yes` to confirm the remote modification.
 
 ```powershell
