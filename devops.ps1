@@ -1,6 +1,6 @@
 ﻿# ============================================================
 # DevOps CLI - Main Application
-# T10: Interactive CLI Menu
+# T13: Interactive Terminal UI
 #
 # Compatible with Windows PowerShell 5.1.
 # ============================================================
@@ -39,6 +39,8 @@ function Import-DevOpsFunction {
 # script scope below.
 
 $scriptFiles = @(
+    (Join-Path $projectRoot "src/UI/Show-Menu.ps1")
+    (Join-Path $projectRoot "src/UI/Write-DevOpsUI.ps1")
     (Join-Path $configDirectory "New-SSHConfig.ps1")
     (Join-Path $configDirectory "Get-SSHConfig.ps1")
     (Join-Path $configDirectory "Set-SSHConfig.ps1")
@@ -64,20 +66,6 @@ foreach ($file in $scriptFiles) {
 
 
 # STEP 4: Define reusable UI functions.
-function Show-DevOpsHeader {
-    param(
-        [string]$Title = "DEVOPS CLI"
-    )
-
-    Clear-Host
-
-    Write-Host "========================================"
-    Write-Host "  $Title"
-    Write-Host "========================================"
-    Write-Host ""
-}
-
-
 function Wait-DevOpsInput {
     Write-Host ""
     Read-Host "Press Enter to continue" | Out-Null
@@ -91,11 +79,15 @@ function Invoke-DevOpsAction {
     )
 
     try {
+        Clear-Host
+        Show-DevOpsHeader
         & $Action
     }
     catch {
         Write-Host ""
-        Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+        Write-DevOpsMessage $_.Exception.Message -Level ERROR
+        Write-Verbose ($_ | Out-String)
+        Write-DevOpsMessage 'Technical details are available in $Error[0] when dot-sourced.'
     }
 
     Wait-DevOpsInput
@@ -106,22 +98,13 @@ function Invoke-DevOpsAction {
 function Show-SSHConfigMenu {
 
     while ($true) {
-        Show-DevOpsHeader "SSH CONFIGURATION"
-
-        Write-Host "1. List SSH configurations"
-        Write-Host "2. Create SSH configuration"
-        Write-Host "3. Update SSH configuration"
-        Write-Host "4. Delete SSH configuration"
-        Write-Host "0. Back"
-        Write-Host ""
-
-        $choice = Read-Host "Select an option"
+        $choice = Show-Menu -Title 'SSH CONFIGURATION' -Items @('List SSH configurations', 'Create SSH configuration', 'Update SSH configuration', 'Delete SSH configuration')
 
         switch ($choice) {
 
             "1" {
                 Invoke-DevOpsAction {
-                    Get-SSHConfig | Format-List
+                    Show-SSHConfigTable -Configurations @(Get-SSHConfig)
                 }
             }
 
@@ -151,6 +134,7 @@ function Show-SSHConfigMenu {
                     }
 
                     New-SSHConfig @parameters
+                    Write-DevOpsMessage 'SSH configuration saved.' -Level OK
                 }
             }
 
@@ -192,6 +176,7 @@ function Show-SSHConfigMenu {
                     }
                     else {
                         Set-SSHConfig @parameters
+                        Write-DevOpsMessage 'SSH configuration updated.' -Level OK
                     }
                 }
             }
@@ -211,9 +196,10 @@ function Show-SSHConfigMenu {
                         Remove-SSHConfig `
                             -Alias $aliasName `
                             -Confirm:$false
+                        Write-DevOpsMessage 'SSH configuration deleted.' -Level OK
                     }
                     else {
-                        Write-Host "Deletion cancelled."
+                        Write-DevOpsMessage 'Deletion cancelled.' -Level WARN
                     }
                 }
             }
@@ -235,14 +221,7 @@ function Show-SSHConfigMenu {
 function Show-SSHConnectionMenu {
 
     while ($true) {
-        Show-DevOpsHeader "SSH CONNECTION"
-
-        Write-Host "1. Test SSH connection"
-        Write-Host "2. Connect to SSH server"
-        Write-Host "0. Back"
-        Write-Host ""
-
-        $choice = Read-Host "Select an option"
+        $choice = Show-Menu -Title 'SSH CONNECTION' -Items @('Test SSH connection', 'Connect to SSH server')
 
         switch ($choice) {
 
@@ -250,8 +229,10 @@ function Show-SSHConnectionMenu {
                 Invoke-DevOpsAction {
                     $aliasName = Read-Host "SSH alias"
 
-                    Test-SSHConnection -Alias $aliasName |
-                        Format-List
+                    $result = Test-SSHConnection -Alias $aliasName
+                    $result | Format-List | Out-Host
+                    if ($result.Reachable) { Write-DevOpsMessage 'TCP port reachable; SSH login has not been verified.' -Level OK }
+                    else { Write-DevOpsMessage "TCP port unreachable. $($result.Error)" -Level ERROR }
                 }
             }
 
@@ -280,16 +261,7 @@ function Show-SSHConnectionMenu {
 function Show-SSHKeyMenu {
 
     while ($true) {
-        Show-DevOpsHeader "SSH KEY MANAGEMENT"
-
-        Write-Host "1. List SSH keys"
-        Write-Host "2. Generate ED25519 SSH key"
-        Write-Host "3. Validate SSH key pair"
-        Write-Host "4. Install public key on Ubuntu"
-        Write-Host "0. Back"
-        Write-Host ""
-
-        $choice = Read-Host "Select an option"
+        $choice = Show-Menu -Title 'SSH KEY MANAGEMENT' -Items @('List SSH keys', 'Generate ED25519 SSH key', 'Validate SSH key pair', 'Install public key on Ubuntu')
 
         switch ($choice) {
 
@@ -312,7 +284,8 @@ function Show-SSHKeyMenu {
                         $parameters.Comment = $comment
                     }
 
-                    New-SSHKey @parameters | Format-List
+                    New-SSHKey @parameters | Format-List | Out-Host
+                    Write-DevOpsMessage 'SSH key pair created.' -Level OK
                 }
             }
 
@@ -320,9 +293,10 @@ function Show-SSHKeyMenu {
                 Invoke-DevOpsAction {
                     $privateKeyPath = Read-Host "Private key path"
 
-                    Test-SSHKey `
-                        -PrivateKeyPath $privateKeyPath |
-                        Format-List
+                    $result = Test-SSHKey -PrivateKeyPath $privateKeyPath
+                    $result | Format-List | Out-Host
+                    if ($result.IsValid) { Write-DevOpsMessage 'SSH key pair is valid.' -Level OK }
+                    else { Write-DevOpsMessage "Invalid SSH key pair. $($result.Error)" -Level ERROR }
                 }
             }
 
@@ -336,13 +310,15 @@ function Show-SSHKeyMenu {
                     $confirm = Read-Host "Continue? (yes/no)"
 
                     if ($confirm -ceq "yes") {
-                        Install-SSHPublicKey `
+                        $result = Install-SSHPublicKey `
                             -Alias $aliasName `
-                            -PublicKeyPath $publicKeyPath |
-                            Format-List
+                            -PublicKeyPath $publicKeyPath
+                        $result | Format-List | Out-Host
+                        if ($result.Success) { Write-DevOpsMessage "Public key: $($result.Status)." -Level OK }
+                        else { Write-DevOpsMessage 'Public key installation failed.' -Level ERROR }
                     }
                     else {
-                        Write-Host "Installation cancelled."
+                        Write-DevOpsMessage 'Installation cancelled.' -Level WARN
                     }
                 }
             }
@@ -364,21 +340,12 @@ function Show-SSHKeyMenu {
 function Start-DevOpsCLI {
 
     while ($true) {
-        Show-DevOpsHeader "DEVOPS CLI"
-
-        Write-Host "1. SSH Quick Setup"
-        Write-Host "2. SSH Configuration"
-        Write-Host "3. SSH Connection"
-        Write-Host "4. SSH Key Management"
-        Write-Host "0. Exit"
-        Write-Host ""
-
-        $choice = Read-Host "Select an option"
+        $choice = Show-Menu -Title 'MAIN MENU' -Items @('SSH Quick Setup', 'SSH Configuration', 'SSH Connection', 'SSH Key Management') -Root -Descriptions @('Configure a Linux connection', 'Manage SSH host settings', 'Connect to Linux servers', 'Manage SSH authentication keys')
 
         switch ($choice) {
 
             "1" {
-                Invoke-DevOpsAction { Start-SSHQuickSetup | Format-List }
+                Invoke-DevOpsAction { Start-SSHQuickSetup -InteractiveMenu | Format-List }
             }
 
             "2" {
@@ -420,5 +387,11 @@ if ($MyInvocation.InvocationName -ne '.') {
         Write-Host 'Usage: .\devops.ps1 [ssh setup]' -ForegroundColor Red
         exit 1
     }
-    else { Start-DevOpsCLI }
+    else {
+        try { Start-DevOpsCLI }
+        catch {
+            Write-DevOpsMessage $_.Exception.Message -Level ERROR
+            exit 1
+        }
+    }
 }

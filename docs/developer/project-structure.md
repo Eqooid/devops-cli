@@ -11,6 +11,9 @@ devops-cli/
   README.md
   LICENSE
   src/
+    UI/
+      Show-Menu.ps1
+      Write-DevOpsUI.ps1
     Common/
       Input.ps1
       Validation.ps1
@@ -32,6 +35,8 @@ devops-cli/
         Install-SSHPublicKey.ps1
         SSHKey.Tests.ps1
   tests/
+    UI/
+      Menu.Tests.ps1
     Common/
       Common.Tests.ps1
       Structure.Tests.ps1
@@ -57,7 +62,9 @@ devops-cli/
 
 | Path | Responsibility |
 | --- | --- |
-| `devops.ps1` | Explicit function loading, menu rendering, prompts, action error wrapper |
+| `devops.ps1` | Explicit function loading, menu dispatch, prompts, action error wrapper |
+| `src/UI/Show-Menu.ps1` | Console rendering and pure keyboard selection mapping |
+| `src/UI/Write-DevOpsUI.ps1` | Section headers, colored feedback, configuration display |
 | `src/SSH/Setup/Start-SSHQuickSetup.ps1` | Shared confirmed setup workflow and constrained key verification |
 | `run.bat` | Windows PowerShell launcher and pause |
 | `src/Common/Input.ps1` | Legacy `Read-SSHSetupInput`, returns Server/Username/Alias hashtable; unused by current menus |

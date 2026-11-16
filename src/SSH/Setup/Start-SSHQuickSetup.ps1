@@ -7,7 +7,7 @@ function Read-SSHQuickSetupValue {
             & $Validate $value
             return $value
         }
-        catch { Write-Host $_.Exception.Message -ForegroundColor Yellow }
+        catch { Write-Host "[WARN] $($_.Exception.Message)" -ForegroundColor Yellow }
     }
 }
 
@@ -58,17 +58,17 @@ function Start-SSHQuickSetup {
         Status, Success, Alias, CompletedSteps, FailedStep, and Error.
     #>
     [CmdletBinding()]
-    param()
+    param([switch]$InteractiveMenu)
 
     $completed = New-Object 'System.Collections.Generic.List[string]'
     $step = 'Input'
     $aliasName = $null
     try {
-        Write-Host '========================================'
-        Write-Host '            SSH QUICK SETUP'
-        Write-Host '========================================'
-        Write-Host 'Cancel any input with /cancel. No changes occur before explicit yes.'
-        Write-Host 'Step 1/4 - Server Information'
+        Write-Host ''
+        Write-Host ' SSH QUICK SETUP' -ForegroundColor Cyan
+        Write-Host ' --------------------------------------' -ForegroundColor DarkGray
+        Write-Host 'Cancel text input with /cancel. No changes occur before explicit yes.'
+        Write-Host "`n Step 1/4 - Server Information" -ForegroundColor Cyan
         $aliasValidation = {
             param($value)
             if ($value -cnotmatch '\A[A-Za-z0-9][A-Za-z0-9_-]*\z') { throw 'Alias must start with a letter/digit and contain only letters, digits, _ or -.' }
@@ -99,13 +99,18 @@ function Start-SSHQuickSetup {
         if ($portInput -ne '') { $port = [int]$portInput }
         $sshDirectory = Join-Path $HOME '.ssh'
         $configPath = Join-Path $sshDirectory 'config'
-        Write-Host 'Step 2/4 - SSH Key'
-        Write-Host '1. Use an existing SSH key'
-        Write-Host '2. Generate a new ED25519 SSH key'
-        Write-Host '0. Cancel'
-        $keyChoice = Read-SSHQuickSetupValue 'Select an option' {
-            param($value)
-            if ($value -notin @('0', '1', '2')) { throw 'Select 1, 2, or 0.' }
+        Write-Host "`n Step 2/4 - SSH Key" -ForegroundColor Cyan
+        if ($InteractiveMenu) {
+            $keyChoice = [string](Show-Menu -Title 'SSH QUICK SETUP - Step 2/4: Authentication' -Items @('Use an existing SSH key', 'Generate a new ED25519 SSH key'))
+        }
+        else {
+            Write-Host '1. Use an existing SSH key'
+            Write-Host '2. Generate a new ED25519 SSH key'
+            Write-Host '0. Cancel'
+            $keyChoice = Read-SSHQuickSetupValue 'Select an option' {
+                param($value)
+                if ($value -notin @('0', '1', '2')) { throw 'Select 1, 2, or 0.' }
+            }
         }
         if ($keyChoice -eq '0') { throw [OperationCanceledException]::new('Setup cancelled.') }
         $newKey = $keyChoice -eq '2'
@@ -127,18 +132,24 @@ function Start-SSHQuickSetup {
         else {
             $keys = @(Get-SSHKey | Where-Object { $_.HasPrivate -and $_.HasPublic })
             if ($keys.Count -eq 0) { throw 'No key pairs found. Rerun and choose Generate a new key.' }
-            for ($i = 0; $i -lt $keys.Count; $i++) { Write-Host "$($i + 1). $($keys[$i].PrivatePath) $($keys[$i].Fingerprint)" }
-            $selection = Read-SSHQuickSetupValue 'Select private key number' {
-                param($value)
-                $number = 0
-                if (-not [int]::TryParse($value, [ref]$number) -or $number -lt 1 -or $number -gt $keys.Count) { throw 'Select a listed key number.' }
+            if ($InteractiveMenu) {
+                $selection = Show-Menu -Title 'SSH QUICK SETUP - Select key' -Items @($keys | ForEach-Object { $_.PrivatePath }) -Descriptions @($keys | ForEach-Object { $_.Fingerprint })
+                if ($selection -eq 0) { throw [OperationCanceledException]::new('Setup cancelled.') }
+            }
+            else {
+                for ($i = 0; $i -lt $keys.Count; $i++) { Write-Host "$($i + 1). $($keys[$i].PrivatePath) $($keys[$i].Fingerprint)" }
+                $selection = Read-SSHQuickSetupValue 'Select private key number' {
+                    param($value)
+                    $number = 0
+                    if (-not [int]::TryParse($value, [ref]$number) -or $number -lt 1 -or $number -gt $keys.Count) { throw 'Select a listed key number.' }
+                }
             }
             $identityFile = $keys[[int]$selection - 1].PrivatePath
         }
         $identityFile = [IO.Path]::GetFullPath($identityFile)
         if ($identityFile -match '[%$"\r\n]') { throw 'Identity path contains unsupported SSH expansion or quoting characters. Choose another key location.' }
         while ($true) {
-            Write-Host 'Step 3/4 - Review Configuration'
+            Write-Host "`n Step 3/4 - Review Configuration" -ForegroundColor Cyan
             Write-Host "Alias: $aliasName`nHost: $hostName`nUsername: $username`nPort: $port`nIdentityFile: $identityFile"
             if ($newKey) { Write-Host "NEW ED25519 key: may create $identityFile and $identityFile.pub" }
             else { Write-Host 'EXISTING key: will validate and reuse; private key is never uploaded.' }
@@ -166,13 +177,15 @@ function Start-SSHQuickSetup {
             $aliasName = Read-SSHQuickSetupValue 'Choose another SSH alias' $aliasValidation
         }
         $completed.Add($step)
-        Write-Host 'Step 4/4 - Automatic Setup'
+        Write-Host "`n Step 4/4 - Automatic Setup" -ForegroundColor Cyan
         $step = 'Key validation/generation'
+        Write-Host "[INFO] $step..." -ForegroundColor Gray
         if ($newKey) { $null = New-SSHKey -Name $keyName -Comment $comment }
         $validation = Test-SSHKey -PrivateKeyPath $identityFile
         if (-not $validation.IsValid) { throw "Invalid SSH key pair: $($validation.Error)" }
         $completed.Add($step)
         $step = 'SSH configuration'
+        Write-Host "[INFO] $step..." -ForegroundColor Gray
         if (-not $reuse) { New-SSHConfig -Alias $aliasName -HostName $hostName -Username $username -Port $port -IdentityFile $identityFile | Out-Null }
         if (-not (Test-SSHQuickSetupTarget -Alias $aliasName -HostName $hostName -Username $username -Port $port -IdentityFile $identityFile)) {
             throw 'Effective SSH settings do not match the plan. Check inherited/system settings before retrying.'
@@ -181,6 +194,7 @@ function Start-SSHQuickSetup {
         foreach ($step in @('Initial connection', 'Public key installation', 'Key authentication verification')) {
             while ($true) {
                 try {
+                    Write-Host "[INFO] $step..." -ForegroundColor Gray
                     switch ($step) {
                         'Initial connection' {
                             if (-not (Test-SSHConnection -Alias $aliasName).Reachable) { throw 'SSH port unreachable. Check hostname, port, firewall, and Ubuntu ssh service.' }
@@ -197,11 +211,11 @@ function Start-SSHQuickSetup {
                         }
                     }
                     $completed.Add($step)
-                    Write-Host "Succeeded: $step"
+                    Write-Host "[OK] $step" -ForegroundColor Green
                     break
                 }
                 catch {
-                    Write-Host "Failed: $step. $($_.Exception.Message)" -ForegroundColor Yellow
+                    Write-Host "[WARN] $step failed. $($_.Exception.Message)" -ForegroundColor Yellow
                     $retry = Read-SSHQuickSetupValue 'Retry this step? (yes/no)' {
                         param($value)
                         if ($value -cnotin @('yes', 'no')) { throw 'Type yes or no.' }
@@ -210,13 +224,16 @@ function Start-SSHQuickSetup {
                 }
             }
         }
-        Write-Host "Setup verified for $aliasName. Connect with: ssh $aliasName"
+        Write-Host "[OK] Setup verified for $aliasName. Connect with: ssh $aliasName" -ForegroundColor Green
         [pscustomobject]@{ Status = 'Success'; Success = $true; Alias = $aliasName; CompletedSteps = $completed.ToArray(); FailedStep = $null; Error = $null }
     }
     catch {
         $status = 'Failed'
         if ($_.Exception -is [OperationCanceledException]) { $status = 'Cancelled' }
-        Write-Host "$status at ${step}: $($_.Exception.Message)" -ForegroundColor Yellow
+        $level = 'ERROR'
+        $color = 'Red'
+        if ($status -eq 'Cancelled') { $level = 'WARN'; $color = 'Yellow' }
+        Write-Host "[$level] $status at ${step}: $($_.Exception.Message)" -ForegroundColor $color
         Write-Host "Completed: $($completed -join ', '). Existing files are preserved; rerun using any key/config already created."
         [pscustomobject]@{ Status = $status; Success = $false; Alias = $aliasName; CompletedSteps = $completed.ToArray(); FailedStep = $step; Error = $_.Exception.Message }
     }

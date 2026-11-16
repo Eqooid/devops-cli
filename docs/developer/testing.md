@@ -2,6 +2,47 @@
 
 [Developer guide](README.md)
 
+## T13 terminal UI verification
+
+Executed on 2026-11-16 with Windows PowerShell 5.1.26100.9711 and Pester 3.4.0,
+in fresh processes for each isolated suite:
+
+| Invocation | Passed | Failed | Skipped |
+| --- | --- | --- | --- |
+| `tests/UI/Menu.Tests.ps1` | 17 | 0 | 0 |
+| `tests/SSH/Setup/SSHQuickSetup.Tests.ps1` | 32 | 0 | 0 |
+| `tests/SSH/Config` | 14 | 0 | 0 |
+| `tests/SSH/Key/SSHKey.Tests.ps1` | 19 | 0 | 0 |
+| `tests/SSH/InstallPublicKey.Tests.ps1` | 25 | 0 | 0 |
+
+These isolated runs cover 107 passing tests. The full `tests` run still fails
+in existing recursive discovery/nested Pester state and deleted flat-file
+imports; later suites cannot reliably run in that contaminated session. One
+full run reported 6 passed/11 failed; a quiet run stopped in Pester failure
+formatting without a usable result. Neither is the total intended coverage.
+No legacy tests were rewritten as part of UI modernization.
+
+All 27 project PowerShell scripts parse with the 5.1 parser. `git diff --check`
+passes. New key-mapping tests exercise wraparound, Enter, every numeric shortcut,
+invalid keys, Back/Exit, empty/single-item boundaries, and menus over nine items.
+Handler tests mock SSH operations, including explicit remote-write confirmation.
+Child-process tests verify redirected-menu rejection and preservation of direct
+setup dispatch, cancellation and exit codes 0/1/2. Setup tests additionally
+exercise the interactive key menus without touching a real console or server.
+
+Run UI tests in a fresh reviewed PowerShell process (process-only policy
+override, subject to organizational policy):
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Import-Module Pester -RequiredVersion 3.4.0; Invoke-Pester -Script ./tests/UI/Menu.Tests.ps1 -PassThru"
+```
+
+Run the setup suite the same way with `./tests/SSH/Setup/SSHQuickSetup.Tests.ps1`.
+Menu mapping is pure; rendering and physical keys require the
+[manual keyboard checklist](../user/getting-started.md#manual-keyboard-verification).
+Interactive rendering, physical keys, resizing, Ctrl+C restoration, live SSH,
+and real key generation were **not manually verified** during T13.
+
 ## T12 Quick Setup verification
 
 Executed on 2026-11-15 with Windows PowerShell 5.1 and Pester 3.4.0,

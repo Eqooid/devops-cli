@@ -186,6 +186,27 @@ Describe 'SSH Quick Setup orchestration' {
         }
         ($verify -contains 'StrictHostKeyChecking=no') | Should Be $false
     }
+    It 'uses interactive authentication and key selection with the same confirmed plan' {
+        Set-SetupAnswers @('work', 'server.example', 'alice', '', 'yes')
+        Mock Show-Menu { 1 }
+        (Start-SSHQuickSetup -InteractiveMenu).Success | Should Be $true
+        Assert-MockCalled Show-Menu -Times 2 -Exactly -Scope It
+        Assert-MockCalled Install-SSHPublicKey -Times 1 -Exactly -Scope It
+    }
+    It 'cancels from the authentication menu without writing' {
+        Set-SetupAnswers @('work', 'server.example', 'alice', '')
+        Mock Show-Menu { 0 }
+        (Start-SSHQuickSetup -InteractiveMenu).Status | Should Be 'Cancelled'
+        Assert-MockCalled New-SSHConfig -Times 0 -Exactly -Scope It
+        Assert-MockCalled Install-SSHPublicKey -Times 0 -Exactly -Scope It
+    }
+    It 'cancels from the existing key menu without writing' {
+        Set-SetupAnswers @('work', 'server.example', 'alice', '')
+        $script:keyMenuCalls = 0
+        Mock Show-Menu { $script:keyMenuCalls++; if ($script:keyMenuCalls -eq 1) { 1 } else { 0 } }
+        (Start-SSHQuickSetup -InteractiveMenu).Status | Should Be 'Cancelled'
+        Assert-MockCalled New-SSHConfig -Times 0 -Exactly -Scope It
+    }
     It 'rejects multiple effective identities even if one is the selected key' {
         Mock Invoke-SSHQuickSetupClient { @('hostname server.example', 'user alice', 'port 22', "identityfile $script:keyPath", 'identityfile other') }
         Test-SSHQuickSetupTarget -Alias work -HostName server.example -Username alice -Port 22 -IdentityFile $script:keyPath | Should Be $false
@@ -258,7 +279,7 @@ Describe 'Quick Setup CLI integration' {
     It 'routes all main menu choices to the existing menus and shared wizard' {
         $script:choices = New-Object 'System.Collections.Generic.Queue[string]'
         foreach ($choice in @('1', '2', '3', '4', '0')) { $script:choices.Enqueue($choice) }
-        Mock Read-Host { $script:choices.Dequeue() }
+        Mock Show-Menu { [int]$script:choices.Dequeue() }
         Mock Show-DevOpsHeader { }
         Mock Wait-DevOpsInput { }
         Mock Start-SSHQuickSetup { [pscustomobject]@{ Success = $true } }

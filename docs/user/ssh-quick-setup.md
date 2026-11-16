@@ -11,7 +11,10 @@ Start from the repository root with main menu **1. SSH Quick Setup**, or:
 The same wizard collects an alias, hostname/IP, Ubuntu username, and port
 (blank means 22). Aliases start with a letter or digit and contain letters,
 digits, `_`, or `-`. Invalid input can be corrected at its prompt. Enter
-`/cancel` at any wizard prompt, `0` in the key menu, or `no` at review to cancel.
+`/cancel` at any text prompt, `0` in the key menu, or `no` at review to cancel.
+From the main TUI, key menus also support Up/Down, Enter, immediate numeric
+selection and Esc to cancel. The direct command retains text choices requiring
+Enter. In key lists over nine items, the TUI uses arrows/Enter only.
 Before confirmation, cancellation leaves local and remote files unchanged.
 
 Select an existing key pair discovered in `$HOME/.ssh`, or request a new named

@@ -49,7 +49,7 @@ Choose **1** for [SSH Quick Setup](docs/user/ssh-quick-setup.md), or run:
 
 For individual actions, choose **4 > 2** to generate a key, **2 > 2** to create
 an alias, and **4 > 4** to install its public key. Choose **3 > 2** to connect.
-Submenus use **0** to return; the main menu uses
+Use **Up/Down** and **Enter**, or press **1-9** without Enter. **Esc** and **0** return from submenus; the main menu uses
 **0** to exit. The connection test checks TCP only; it does not verify login.
 
 ## Documentation

@@ -7,6 +7,12 @@ and `devops.ps1 ssh setup`. Dot-sourcing the entry point loads definitions witho
 starting a menu. Command mode maps Success to exit 0, failure to 1, cancellation
 to 2; menu mode renders the same result and returns to the menu.
 
+The main menu passes `-InteractiveMenu` for keyboard-driven authentication and
+existing-key choices. Load through `devops.ps1` to supply the shared UI functions.
+Default invocation remains text-based for command/script compatibility. This
+switch changes presentation only; review, authorization and verification use
+the same workflow.
+
 The wizard returns an object containing `Status`, `Success`, `Alias`,
 `CompletedSteps`, `FailedStep`, and `Error`. It emits progress through Write-Host,
 not the result stream. It has no persisted workflow state or rollback engine.

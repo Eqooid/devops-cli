@@ -1,6 +1,6 @@
 # User guide
 
-DevOps CLI provides numbered menus for working with SSH. SSH lets you connect
+DevOps CLI provides keyboard-driven numbered menus for working with SSH. SSH lets you connect
 securely to another computer, such as an Ubuntu server. The CLI does not create
 the server or the Ubuntu account.
 

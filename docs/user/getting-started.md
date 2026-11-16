@@ -17,12 +17,59 @@ The main menu displays:
 4. SSH Key Management
 0. Exit
 
-Select an option: 1
+Up/Down Navigate   Enter Select   1-9 Quick select   Esc/0 Exit
 ```
 
-Type one number and press Enter. Each action finishes with **Press Enter to
-continue**. Invalid choices display **Invalid option.** and wait for Enter.
-The terminal is cleared when the next menu is drawn.
+Press **1-9** to select immediately, or use **Up/Down** (wrapping) and **Enter**.
+Each action finishes with **Press Enter to
+continue**. Invalid keys and out-of-range numbers are ignored.
+Menus repaint on selection changes and terminal resize. **Esc** or **0** returns; at the main menu either exits. Text fields and confirmations still require Enter.
+
+Use Windows PowerShell 5.1 in Windows Terminal or a console PowerShell window,
+with unredirected input and output. ISE and non-console hosts cannot run the TUI.
+The minimum window size is 25 columns by 12 rows; smaller windows show an error.
+Long menu labels are shortened, descriptions are hidden below 80 columns, and
+long menus scroll with the highlight. Menus over nine items use arrows/Enter
+only (digits 1-9 are ignored); Esc/0 still returns. Configurations use a wrapped
+table at 80 columns or wider and labeled records in narrower windows.
+ASCII controls avoid dependence on special fonts. Wide Unicode characters in
+user-supplied paths may not align precisely with console cells.
+
+The direct command `.\devops.ps1 ssh setup` retains text prompts and numeric
+choices requiring Enter. It does not open the TUI. Dot-sourcing
+`. .\devops.ps1` only loads functions. Ctrl+C retains normal process interruption.
+
+## Manual keyboard verification
+
+These steps require a real interactive terminal; automated unit tests do not
+establish that console rendering or physical keyboard behavior works.
+
+1. Run `.\devops.ps1`. Press Up at the first choice and Down at the last;
+   verify wrapping. Select each submenu with Enter, then return with Esc and 0.
+2. Press 2 without Enter. Verify configuration opens immediately. Press 9 and
+   letters; verify they do nothing. Press 1 to list existing configurations.
+   Check all five fields at 100 and 60 columns, including long identity paths.
+3. Resize while a menu is open; verify repaint, readable controls and no
+   scrolling/flicker while idle. Try a 25x12 window, then below the minimum;
+   verify the error and a usable cursor. Restart after enlarging the window.
+4. Dot-source the entry point and run
+   `Show-Menu -Title 'Long list' -Items @(1..12 | ForEach-Object { "Item $_" })`.
+   Verify digits 1-9 do nothing, arrows scroll/wrap, Enter on item 10 returns
+   10, and Esc/0 returns 0.
+5. Open Quick Setup, enter disposable target values, and cancel at both key
+   menus with Esc/0. Verify no setup changes occur. At review, type `no` to
+   cancel; verify the complete plan and remote authorized_keys notice appear.
+6. Test an invalid alias in a read-only connection operation. Verify a red
+   error, Enter returns to the menu, and text prompts have no stray menu keys.
+   Start configuration deletion or public-key installation and answer `no`;
+   verify no changes. Never authorize a write merely to test navigation.
+7. Press Ctrl+C while navigating and while at a text prompt. Verify normal
+   interruption and restored cursor visibility. Restart and exit the root with
+   Esc, then with 0. Verify the terminal remains usable.
+
+For real key generation, host fingerprint verification, authentication retries,
+and verified login, follow the authorized-server
+[Quick Setup acceptance procedure](ssh-quick-setup.md#manual-end-to-end-acceptance).
 
 ## Available menus
 

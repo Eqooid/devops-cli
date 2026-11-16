@@ -29,7 +29,7 @@ Error      :
 ```
 
 `Reachable : False` includes an error such as timeout or connection refusal.
-Configuration failures throw and the menu displays `ERROR:`. A successful TCP
+Configuration failures throw and the menu displays `[ERROR]`. A successful TCP
 check can still be followed by an authentication failure. It may fail for an
 alias that needs ProxyJump/ProxyCommand because it probes the target directly.
 
