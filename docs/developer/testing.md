@@ -2,6 +2,58 @@
 
 [Developer guide](README.md)
 
+## T14 completion and verification
+
+| Task | Status |
+| --- | --- |
+| T14.1 — Remote SSH Command Execution | COMPLETE — VERIFIED |
+| T14.2 — Remote System Information | COMPLETE — VERIFIED |
+| T14.3 — CLI Menu Integration | COMPLETE — VERIFIED |
+| T14 Overall | COMPLETE — VERIFIED |
+
+The project owner reported successful manual verification on Windows PowerShell
+5.1 with Windows OpenSSH connecting to Ubuntu, using configured aliases, custom
+identity files, and interactive passphrase prompts without requiring SSH Agent.
+This covers remote command execution, structured system information retrieved
+through one SSH execution, and main menu option **5** with readable sections,
+error handling, and return to the menu. This is the owner's previously reported
+verification; Codex did not independently execute those live manual tests.
+
+During documentation finalization on 2026-11-18, Codex reviewed the three
+`src/SSH/Remote` functions and `devops.ps1` against the documented parameters,
+commands, paths, output fields, and menu flow. Documentation checks cover
+Markdown links/heading targets, PowerShell example syntax, and comparison of
+non-documentation file hashes with the starting working tree. These are static
+checks, not renewed SSH acceptance or evidence of a green full Pester suite.
+
+Documentation checks passed: 20 Markdown files with 114 relative links and
+heading targets; 59 PowerShell blocks parsed with Windows PowerShell
+5.1.26100.9711; five T14 example calls checked against source parameter names;
+balanced fenced blocks; and `git diff --check`. All 35 non-documentation files
+matched their starting SHA-256 hashes, including the owner's existing source and
+test changes. No application source, tests, SSH configuration, or keys were edited;
+no dependencies were added, and no commit or push was performed.
+
+Current source limits are documented rather than changed: `TimeoutSeconds` is
+unused (SSH connection timeout is fixed at five seconds), and native stderr under
+Windows PowerShell 5.1 `ErrorActionPreference=Stop` can throw before a structured
+failure result is returned. `nproc` reports CPUs available to the remote process,
+which can differ from the host's total logical CPU count under restrictions.
+See the [T14 function reference](ssh-module.md#invoke-sshcommand).
+
+The following existing scripts are interactive manual helpers, not Pester suites:
+
+| Path | Purpose |
+| --- | --- |
+| `tests/SSH/Remote/Test-SSHCommand.ps1.ps1` | Prompt for an alias; run hostname, kernel, and uptime in one command and check three output lines; doubled extension is the actual filename |
+| `tests/SSH/Remote/Test-RemoteSystemInfo.ps1` | Load the command/collector functions, prompt for an alias, display collected data |
+| `tests/SSH/Remote/Show-RemoteSystemInfo.ps1` | Standalone manual display script, distinct from the production presentation function |
+
+These helpers contact a real server and were not run during this documentation
+task. Historical results below retain their original scope; earlier statements
+about unverified live SSH do not override the owner's T14 verification. No T15
+implementation was introduced.
+
 ## T13 terminal UI verification
 
 Executed on 2026-11-16 with Windows PowerShell 5.1.26100.9711 and Pester 3.4.0,

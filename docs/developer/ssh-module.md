@@ -11,8 +11,10 @@ pipeline input explicitly. Advanced functions also have PowerShell common
 parameters; those are omitted from the signatures below.
 
 All CRUD functions use `Join-Path $HOME '.ssh'` and file `config`; they expose no
-`ConfigPath`/`SSHDirectory` override. Every SSH executable is discovered through
+`ConfigPath`/`SSHDirectory` override. Most SSH functions discover executables through
 `Get-Command -CommandType Application`, not a supplied `SshPath`.
+`Invoke-SSHCommand` tries `Get-Command ssh.exe` then `Get-Command ssh` without
+that type filter.
 
 ## New-SSHConfig
 
@@ -317,6 +319,123 @@ No parameters. Interactive orchestration returning `Status`, `Success`, `Alias`,
 See [wizard architecture](ssh-quick-setup.md) and the
 [user workflow](../user/ssh-quick-setup.md) for validation, authentication,
 retry behavior, and supported configuration limits.
+
+## Invoke-SSHCommand
+
+Source: [Remote/Invoke-SSHCommand.ps1](../../src/SSH/Remote/Invoke-SSHCommand.ps1).
+Executes a caller-supplied Linux shell command through native OpenSSH.
+
+```text
+Invoke-SSHCommand -HostAlias <string> -Command <string> [-TimeoutSeconds <int>] [-BatchMode]
+```
+
+- `HostAlias` and `Command` are mandatory strings. The alias is checked against
+  `^[a-zA-Z0-9][a-zA-Z0-9._-]*$`; a whitespace-only command is rejected.
+  The alias is passed directly to OpenSSH, which resolves configuration and custom
+  `IdentityFile` settings. There is no `IdentityFile` parameter or local check
+  that the alias exists in the configuration.
+- `TimeoutSeconds` defaults to 30 and accepts 1-3600, but is **unused** by the
+  implementation. It does not impose a command deadline. SSH always receives
+  `ConnectTimeout=5` and `ConnectionAttempts=1`.
+- Without `BatchMode`, SSH receives `BatchMode=no` and retains terminal access
+  for interactive authentication, including private-key passphrases. SSH Agent
+  is optional. `-BatchMode` sets `BatchMode=yes`, disabling interactive
+  authentication prompts; an encrypted key then needs an already usable
+  noninteractive authentication method, such as an unlocked agent identity.
+- Host verification is always `StrictHostKeyChecking=yes`. An unknown or changed
+  host key fails; establish trust independently before calling this function.
+- Output: one `PSCustomObject` with `HostAlias`, `Command`, `Success` (exit code
+  equals zero), `ExitCode` (native `LASTEXITCODE`), `Output` (stdout string), and
+  `Error` (stderr string). Both strings have trailing whitespace trimmed.
+  Inspect `Success` and `ExitCode`; stderr can also exist on successful commands.
+- Validation and missing OpenSSH errors throw. Native execution errors can also
+  throw: Windows PowerShell 5.1 redirected stderr under `ErrorActionPreference=Stop`
+  is not specially guarded here, so a result object is not guaranteed on every
+  failure. Otherwise a nonzero native exit returns `Success=$false`.
+- Stdout and stderr use two local temporary files removed in `finally` after
+  execution. `Command` is executable remote shell code, not escaped user data;
+  direct calls execute immediately with no confirmation or `WhatIf` support.
+
+```powershell
+. ./src/SSH/Remote/Invoke-SSHCommand.ps1
+$result = Invoke-SSHCommand -HostAlias ubuntu-dev -Command 'hostname && uname -r && uptime -p'
+$result | Format-List HostAlias, Command, Success, ExitCode, Output, Error
+```
+
+## Get-RemoteSystemInfo
+
+Source: [Remote/Get-RemoteSystemInfo.ps1](../../src/SSH/Remote/Get-RemoteSystemInfo.ps1).
+
+```text
+Get-RemoteSystemInfo -HostAlias <string>
+```
+
+`HostAlias` is a mandatory string passed to `Invoke-SSHCommand`. Load both files
+for a direct call. No timeout, batch-mode, or identity-file parameters are exposed;
+SSH configuration and default interactive authentication apply.
+
+One SSH execution runs a literal Bash script using `hostname`, `/etc/os-release`
+(`PRETTY_NAME`), `uname -r`, `uname -m`, `nproc`, `free -b`, `awk`, `df -P -k /`,
+and `uptime -p`. The remote shell also needs `printf`, `base64 -d`, and `bash`.
+These are expected on the target Ubuntu environment; the CLI installs none.
+
+Before UTF-8/Base64 encoding, `.Replace("`r`n", "`n").Replace("`r", "`n")`
+normalizes Windows CRLF and lone CR line endings to Unix LF. Bash otherwise treats
+carriage returns as literal command/argument characters, causing failures such as
+`set: invalid option` or commands ending in `\r`. The single-line
+`printf '%s' '<encoded script>' | base64 -d | bash` transports the multiline
+script without fragile nested quoting or local PowerShell expansion of Bash
+variables. **Base64 is safe script transport, not encryption**; SSH provides
+transport encryption. The encoded script contains no SSH credentials.
+
+Stdout is parsed as `KEY=VALUE` lines matching `^([A-Z_]+)=(.*)$`. Other lines are
+ignored; repeated keys overwrite earlier values. Every required field must exist
+and be nonblank. Retrieval failure, missing/empty fields, or numeric conversion
+failure throws. The script uses `set -e` but no `pipefail`; field validation is
+also needed because individual utility failures may not propagate to the final
+SSH exit code. This is not a general-purpose Linux output parser.
+
+The returned `PSCustomObject` contains:
+
+| Fields | Meaning |
+| --- | --- |
+| `HostAlias`, `Hostname`, `OS`, `Kernel`, `Architecture` | Requested alias and remote system strings |
+| `LogicalCPUs` | Integer from `nproc` (processors available to the remote process) |
+| `MemoryTotalGiB`, `MemoryUsedGiB`, `MemoryAvailableGiB` | `free -b` total, used, available bytes converted to GiB and rounded to two decimals |
+| `DiskTotalGiB`, `DiskUsedGiB` | Root filesystem values from `df -P -k /`, converted from 1024-byte units to GiB and rounded to two decimals |
+| `DiskUsagePercent` | Integer from root filesystem use percentage, with `%` removed |
+| `Uptime` | Human-readable `uptime -p` text |
+
+```powershell
+. ./src/SSH/Remote/Invoke-SSHCommand.ps1
+. ./src/SSH/Remote/Get-RemoteSystemInfo.ps1
+$info = Get-RemoteSystemInfo -HostAlias ubuntu-dev
+$info | Format-List
+```
+
+## Show-RemoteSystemInfo
+
+Source: [Remote/Show-RemoteSystemInfo.ps1](../../src/SSH/Remote/Show-RemoteSystemInfo.ps1).
+
+```text
+Show-RemoteSystemInfo -HostAlias <string>
+```
+
+The mandatory `HostAlias` string is passed to `Get-RemoteSystemInfo`. Displays
+SYSTEM, MEMORY, DISK /, and UPTIME sections using `Write-Host`, with `[OK]` on
+success. Disk percentage is green below 75, yellow at 75-89, and red at 90 or
+higher. Returns `$true` on success; catches retrieval/display errors, prints
+`[ERROR]` in red, and returns `$false`. It does not return the system data object
+or pause by itself. Load the two dependencies first, or dot-source the entry
+point, which loads all three files without starting the menu:
+
+```powershell
+. ./devops.ps1
+$success = Show-RemoteSystemInfo -HostAlias ubuntu-dev
+```
+
+Main menu option **5** supplies the alias prompt and Enter-to-return behavior;
+see [menu data flow](architecture.md#t14-remote-system-information).
 
 ## Legacy Common helpers
 

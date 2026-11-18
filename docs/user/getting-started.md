@@ -15,6 +15,7 @@ The main menu displays:
 2. SSH Configuration
 3. SSH Connection
 4. SSH Key Management
+5. Remote System Information
 0. Exit
 
 Up/Down Navigate   Enter Select   1-9 Quick select   Esc/0 Exit
@@ -83,6 +84,29 @@ Use **0** in a submenu to return to the main menu. Use **0** there to exit with
 **Goodbye!**. These choices do not delete or undo saved work. During an SSH
 session, type `exit` or press Ctrl+D to disconnect first; then press Enter when
 the CLI asks. Avoid interrupting a configuration write or key installation.
+
+## Remote System Information (T14)
+
+Choose main menu **5 — Remote System Information**, then enter a configured
+SSH alias such as `ubuntu-dev`. Blank input displays a warning; surrounding
+whitespace is trimmed. OpenSSH uses the alias's effective configuration,
+including a custom `IdentityFile`. SSH Agent is optional: default interactive
+authentication permits a private-key passphrase prompt in the terminal.
+
+The host key must already be trusted. T14 uses `StrictHostKeyChecking=yes` and
+refuses an unknown or changed key. For a new host, connect using `ssh ubuntu-dev`
+and verify its fingerprint through a trusted channel first.
+
+The display contains **SYSTEM**, **MEMORY**, **DISK /**, and **UPTIME** sections.
+Memory and disk sizes are shown in GiB; disk usage is green below 75%, yellow
+from 75%, and red from 90%. All information is collected in one SSH execution.
+Errors display a red `[ERROR]` message. After success, failure, or blank input,
+press Enter at **Press Enter to continue** to return to the main menu.
+Existing arrows, Enter, numeric shortcuts, and Esc/0 navigation still apply.
+
+For structured objects or arbitrary remote commands, see the
+[function reference](../developer/ssh-module.md#invoke-sshcommand). There is no
+interactive arbitrary-command menu or additional direct command dispatch.
 
 ## First-use walkthrough
 

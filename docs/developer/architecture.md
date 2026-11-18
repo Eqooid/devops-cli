@@ -9,7 +9,7 @@ the launcher's directory, preserves its process exit code, and pauses. It does
 not select PowerShell 7, change execution policy, or interpret menu actions.
 
 `devops.ps1` sets `ErrorActionPreference` to `Stop`, builds paths using
-`PSScriptRoot`, verifies eleven named feature scripts and two UI scripts exist, and dot-sources them
+`PSScriptRoot`, verifies fourteen named feature scripts and two UI scripts exist, and dot-sources them
 at script scope. Direct invocation starts `Start-DevOpsCLI`, or dispatches
 `ssh setup` to `Start-SSHQuickSetup`. Dot-sourcing loads definitions without
 starting either workflow. See [Quick Setup](ssh-quick-setup.md) for its contract.
@@ -30,6 +30,8 @@ flowchart TD
     MAIN --> CONFIG[Show-SSHConfigMenu]
     MAIN --> CONNECTION[Show-SSHConnectionMenu]
     MAIN --> KEY[Show-SSHKeyMenu]
+    MAIN --> INFO[Invoke-RemoteSystemInfoMenuAction]
+    INFO --> ACTION
     CONFIG --> ACTION[Invoke-DevOpsAction]
     CONNECTION --> ACTION
     KEY --> ACTION
@@ -85,10 +87,30 @@ The individual key, config, and connection actions remain available.
 The Common setup-input helpers remain in the repository but are not loaded by
 this menu entry point.
 
+## T14 remote system information
+
+Main menu option **5** calls `Invoke-RemoteSystemInfoMenuAction` through
+`Invoke-DevOpsAction`. It prompts for an alias, warns on blank input, trims it,
+and calls `Show-RemoteSystemInfo`, suppressing that function's Boolean result.
+The display function catches retrieval errors and prints a red `[ERROR]` message;
+the action wrapper waits for Enter before the main menu resumes.
+
+`Show-RemoteSystemInfo` calls `Get-RemoteSystemInfo`, which invokes
+`Invoke-SSHCommand` once. A literal Bash here-string preserves Bash variables.
+The script normalizes CRLF and lone CR to LF **before** UTF-8/Base64 encoding;
+otherwise Bash can interpret carriage returns as command or argument characters.
+A single-line `printf '%s' '<encoded script>' | base64 -d | bash` command avoids
+multiline quoting and local PowerShell variable expansion during script transport.
+Base64 is not encryption; SSH encrypts transport. The script reads system data,
+then PowerShell parses and validates required `KEY=VALUE` fields into an object.
+See the [function contracts](ssh-module.md#invoke-sshcommand) for parameters,
+units, dependencies, errors, and implementation limits.
+
 ## Native programs and errors
 
-Functions discover applications with `Get-Command -CommandType Application` and
-invoke them using `&` with separate arguments. `ssh -G` evaluates configuration
+Most functions discover applications with `Get-Command -CommandType Application` and
+invoke them using `&` with separate arguments. T14's `Invoke-SSHCommand` instead
+tries `Get-Command ssh.exe`, then `Get-Command ssh`, without a command-type filter. `ssh -G` evaluates configuration
 without connecting. `Test-SSHConnection` then uses .NET `TcpClient`; it does not
 authenticate. `Connect-SSH` uses native interactive SSH. Key creation/validation
 uses `ssh-keygen`, including a local private-key read for pair validation.

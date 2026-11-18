@@ -25,6 +25,10 @@ devops-cli/
         Get-SSHConfig.ps1
         Set-SSHConfig.ps1
         Remove-SSHConfig.ps1
+      Remote/
+        Invoke-SSHCommand.ps1
+        Get-RemoteSystemInfo.ps1
+        Show-RemoteSystemInfo.ps1
       Connection/
         Test-SSHConnection.ps1
         Connect-SSH.ps1
@@ -43,6 +47,10 @@ devops-cli/
     SSH/
       SSH.Tests.ps1
       RemoteInstall.Tests.ps1
+      Remote/
+        Test-SSHCommand.ps1.ps1
+        Test-RemoteSystemInfo.ps1
+        Show-RemoteSystemInfo.ps1
       InstallPublicKey.Tests.ps1
       Setup/
         SSHQuickSetup.Tests.ps1
@@ -80,6 +88,9 @@ devops-cli/
 | `src/SSH/Key/Test-SSHKey.ps1` | Derive public material locally and compare a pair |
 | `src/SSH/Key/Install-SSHPublicKey.ps1` | Validate public material and append remotely through an alias |
 | `src/SSH/Key/SSHKey.Tests.ps1` | Duplicate test artifact, not a runtime library; do not dot-source recursively |
+| `src/SSH/Remote/Invoke-SSHCommand.ps1` | Execute a remote command with captured output and exit status |
+| `src/SSH/Remote/Get-RemoteSystemInfo.ps1` | Collect and parse system information through one SSH execution |
+| `src/SSH/Remote/Show-RemoteSystemInfo.ps1` | Display system, memory, root disk, uptime, and retrieval errors |
 
 ## Tests and documentation
 

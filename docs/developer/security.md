@@ -88,6 +88,17 @@ installers can race duplicate detection. No remote backup, lock, or rollback is
 implemented; directory creation/permissions may remain after failure. Standard
 Ubuntu shell utilities and a POSIX-compatible command environment are assumed.
 
+T14's `Invoke-SSHCommand` executes the supplied command as remote shell code;
+callers must not concatenate untrusted input into it. It passes the alias to
+OpenSSH, honors configured custom identities, and always sets
+`StrictHostKeyChecking=yes`. Default `BatchMode=no` permits interactive passphrase
+prompts without SSH Agent; `-BatchMode` disables those prompts.
+`Get-RemoteSystemInfo` transports a fixed LF-normalized Bash script in Base64;
+Base64 is not encryption. Local stdout/stderr temporary files are removed after
+execution in `finally`. Captured output may contain sensitive remote data, and
+`TimeoutSeconds` currently supplies no execution deadline. See the
+[function contracts](ssh-module.md#invoke-sshcommand) for error handling limits.
+
 ## Validation boundaries
 
 Current functions do not share a single validator: alias patterns and path checks

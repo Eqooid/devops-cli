@@ -14,12 +14,16 @@ guides; the current setup wizard orchestrates the existing feature functions.
 - [Security](security.md): implemented safeguards and their limits.
 - [Contributing](contributing.md): adding functions, menu actions, tests and docs.
 
-Documentation audit status: **PARTIAL — VERIFICATION REQUIRED**. The menu
-navigation and selected suites were executed under Windows PowerShell 5.1.
-The complete suite is currently broken by existing source/test layout and legacy
-references. See [exact results](testing.md#observed-results) rather than relying
-on the older audit's test counts. Documentation examples are not evidence of
-live Ubuntu acceptance or PowerShell 7 support.
+T14 status: **COMPLETE — VERIFIED**. The project owner reported successful manual
+Windows PowerShell 5.1 / Windows OpenSSH-to-Ubuntu verification of remote command
+execution, system information, and menu integration. See the
+[T14 completion record](testing.md#t14-completion-and-verification) for scope and
+separate documentation checks. Codex did not repeat those live SSH tests.
+
+The complete automated suite still has existing source/test layout and legacy
+reference failures. See [exact historical results](testing.md#observed-results).
+T14 verification does not establish PowerShell 7 support or live acceptance of
+unrelated features.
 
 All documentation examples use illustrative hosts/accounts. Never include real
 credentials, private keys, or unredacted authentication logs in contributions.

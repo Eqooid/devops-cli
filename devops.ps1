@@ -15,6 +15,7 @@ $projectRoot = $PSScriptRoot
 $configDirectory = Join-Path $projectRoot "src/SSH/Config"
 $connectionDirectory = Join-Path $projectRoot "src/SSH/Connection"
 $keyDirectory = Join-Path $projectRoot "src/SSH/Key"
+$remoteDirectory = Join-Path $projectRoot "src/SSH/Remote"
 
 
 # STEP 2: Load an existing PowerShell function.
@@ -54,6 +55,10 @@ $scriptFiles = @(
     (Join-Path $keyDirectory "Test-SSHKey.ps1")
     (Join-Path $keyDirectory "Install-SSHPublicKey.ps1")
     (Join-Path $projectRoot "src/SSH/Setup/Start-SSHQuickSetup.ps1")
+
+    (Join-Path $remoteDirectory "Invoke-SSHCommand.ps1"),
+    (Join-Path $remoteDirectory "Get-RemoteSystemInfo.ps1"),
+    (Join-Path $remoteDirectory "Show-RemoteSystemInfo.ps1")
 )
 
 foreach ($file in $scriptFiles) {
@@ -336,11 +341,43 @@ function Show-SSHKeyMenu {
 }
 
 
-# STEP 8: Main application menu.
+# STEP 8: Remote System Information menu action.
+function Invoke-RemoteSystemInfoMenuAction {
+    Invoke-DevOpsAction {
+        $aliasName = Read-Host "SSH alias"
+
+        if ([string]::IsNullOrWhiteSpace($aliasName)) {
+            Write-DevOpsMessage 'SSH alias is required.' -Level WARN
+            return
+        }
+
+        # The presentation function handles SSH and its own error messages.
+        # Suppress its Boolean return value in the interactive menu.
+        $null = Show-RemoteSystemInfo -HostAlias $aliasName.Trim()
+    }
+}
+
+# STEP 9: Main application menu.
 function Start-DevOpsCLI {
 
     while ($true) {
-        $choice = Show-Menu -Title 'MAIN MENU' -Items @('SSH Quick Setup', 'SSH Configuration', 'SSH Connection', 'SSH Key Management') -Root -Descriptions @('Configure a Linux connection', 'Manage SSH host settings', 'Connect to Linux servers', 'Manage SSH authentication keys')
+       $choice = Show-Menu `
+            -Title 'MAIN MENU' `
+            -Items @(
+                'SSH Quick Setup',
+                'SSH Configuration',
+                'SSH Connection',
+                'SSH Key Management',
+                'Remote System Information'
+            ) `
+            -Root `
+            -Descriptions @(
+                'Configure a Linux connection',
+                'Manage SSH host settings',
+                'Connect to Linux servers',
+                'Manage SSH authentication keys',
+                'View Linux server system information'
+            )
 
         switch ($choice) {
 
@@ -365,6 +402,10 @@ function Start-DevOpsCLI {
                 return
             }
 
+            "5" {
+                Invoke-RemoteSystemInfoMenuAction
+            }
+
             default {
                 Write-Host "Invalid option."
                 Wait-DevOpsInput
@@ -374,7 +415,7 @@ function Start-DevOpsCLI {
 }
 
 
-# STEP 9: Start the application.
+# STEP 10: Start the application.
 if ($MyInvocation.InvocationName -ne '.') {
     if ($Command -eq 'ssh' -and $Action -eq 'setup' -and $args.Count -eq 0) {
         $result = Start-SSHQuickSetup

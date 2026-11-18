@@ -135,3 +135,70 @@ policy option. Do not weaken managed policy permanently.
 For a changed SSH host key, verify the new fingerprint independently before
 repairing `known_hosts`. Do not disable host verification or remove entries just
 to silence the warning. The CLI does not manage `known_hosts` for you.
+
+## T14 remote command or system information unavailable
+
+Check effective configuration and native SSH first:
+
+```powershell
+ssh -G ubuntu-dev | Select-String '^(hostname|user|port|identityfile) '
+ssh ubuntu-dev 'hostname && uname -r && uptime -p'
+```
+
+A successful TCP test alone does not prove authentication or remote execution.
+Verify the username, custom identity path, network route, and server access.
+T14 requires an already trusted host key (`StrictHostKeyChecking=yes`). For a
+new host, verify the fingerprint independently during an ordinary SSH connection.
+For changed keys, follow the host-key guidance above; do not disable verification.
+
+SSH Agent is optional. T14 defaults to interactive authentication, so enter the
+private-key passphrase at the native prompt. If calling `Invoke-SSHCommand` with
+`-BatchMode`, prompts are disabled; omit that switch when a prompt is needed.
+This differs from Quick Setup's separate unattended key-verification step.
+
+Inspect structured execution output before trying the parser:
+
+```powershell
+. ./src/SSH/Remote/Invoke-SSHCommand.ps1
+$result = Invoke-SSHCommand -HostAlias ubuntu-dev -Command 'hostname && uname -r && uptime -p'
+$result | Format-List Success, ExitCode, Output, Error
+```
+
+If a terminating native error prevents a result, inspect the displayed error and
+`$Error[0]` locally. `TimeoutSeconds` is currently unused; only the fixed SSH
+connection timeout applies, and a running remote command has no built-in deadline.
+
+Check remote dependencies without installing or changing anything:
+
+```powershell
+ssh ubuntu-dev 'command -v bash base64 hostname uname nproc free awk df uptime; test -r /etc/os-release'
+ssh ubuntu-dev 'free -b; df -P -k /; uptime -p; cat /etc/os-release'
+```
+
+Verify each utility path/output, the `Mem:` fields from `free`, the second row
+from `df`, and `PRETTY_NAME` in `/etc/os-release`. Missing utilities, restricted
+shells, or different output formats can prevent collection. Then load and call:
+
+```powershell
+. ./src/SSH/Remote/Get-RemoteSystemInfo.ps1
+Get-RemoteSystemInfo -HostAlias ubuntu-dev | Format-List
+```
+
+`Missing remote system field` or `Empty remote system field` means required
+`KEY=VALUE` output was absent or blank. Numeric conversion errors indicate an
+unexpected value. Compare the script's field names in
+[Get-RemoteSystemInfo.ps1](../../src/SSH/Remote/Get-RemoteSystemInfo.ps1) with
+captured stdout from that exact generated command; a generic successful `hostname`
+probe alone does not establish parser success. Unexpected banners are ignored
+unless they look like field assignments. Required fields and units are listed in
+the [function reference](../developer/ssh-module.md#get-remotesysteminfo).
+
+## Bash parsing failures from Windows line endings
+
+Windows CRLF includes a carriage return that Bash can treat as part of a command
+or option, producing errors such as `set: invalid option` or `command not found`.
+The T14 script must normalize CRLF and lone CR to Unix LF **before** UTF-8/Base64
+encoding and remote execution. `Get-RemoteSystemInfo` already performs this
+normalization. If errors recur, check that the current function was reloaded and
+that any edited script keeps this step before encoding. Base64 preserves the
+original bytes; it does not fix line endings and is not encryption.

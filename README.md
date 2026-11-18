@@ -12,6 +12,10 @@ keys. It uses the installed OpenSSH tools and an existing Ubuntu account.
 - Generate ED25519 keys, list public-key metadata, and validate key pairs.
 - Install a public key through an existing alias while preserving authorized keys
   and detecting duplicate key material.
+- Execute remote Linux commands through configured aliases and custom identity
+  files, with interactive passphrase prompts and structured results.
+- View remote hostname, OS, kernel, CPU, RAM, root disk usage, and uptime through
+  one SSH execution using main menu **5 — Remote System Information**.
 
 There is no deployment, provisioning, package installation, key deletion, or
 automatic SSH server configuration feature.
@@ -21,6 +25,7 @@ automatic SSH server configuration feature.
 The verified client environment is Windows PowerShell 5.1 on Windows with `ssh`
 and `ssh-keygen` in PATH. PowerShell 7 and Linux clients are not verified.
 Ubuntu needs OpenSSH Server and an account you can already authenticate to.
+SSH Agent is optional; T14 can prompt for a private-key passphrase directly.
 See [installation](docs/user/installation.md) for server prerequisites.
 
 ```powershell
@@ -51,6 +56,9 @@ For individual actions, choose **4 > 2** to generate a key, **2 > 2** to create
 an alias, and **4 > 4** to install its public key. Choose **3 > 2** to connect.
 Use **Up/Down** and **Enter**, or press **1-9** without Enter. **Esc** and **0** return from submenus; the main menu uses
 **0** to exit. The connection test checks TCP only; it does not verify login.
+Choose **5**, enter an SSH alias, and press Enter after the system information
+display to return to the main menu. See the [remote system information guide](docs/user/getting-started.md#remote-system-information-t14)
+and [remote function reference](docs/developer/ssh-module.md#invoke-sshcommand).
 
 ## Documentation
 
@@ -72,8 +80,15 @@ $result | Select-Object TotalCount, PassedCount, FailedCount, SkippedCount
 The current tree includes stale legacy tests and a test script under `src` that
 breaks recursive test loading. The complete suite is not green. See
 [testing](docs/developer/testing.md) for exact observed results and isolated runs.
-The menu is implemented; live Ubuntu installation and PowerShell 7 remain
-unverified. This is a development project, not a transactional SSH administrator.
+T14 is **COMPLETE — VERIFIED**: the project owner reported successful manual
+verification of remote command execution, system information, and menu integration
+on Windows PowerShell 5.1 with Windows OpenSSH connecting to Ubuntu, including
+custom identity files and passphrase prompts without requiring SSH Agent.
+See the [T14 completion record](docs/developer/testing.md#t14-completion-and-verification)
+for individual task status and the separate documentation checks. Codex did not
+repeat the owner's live SSH tests. PowerShell 7 and live public-key installation
+remain outside that verification scope. This is a development project, not a
+transactional SSH administrator.
 
 Never share private keys, passwords, or passphrases. Confirm new host fingerprints
 through a trusted channel. Updates/deletion save configuration backups, but
