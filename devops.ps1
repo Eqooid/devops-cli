@@ -58,7 +58,10 @@ $scriptFiles = @(
 
     (Join-Path $remoteDirectory "Invoke-SSHCommand.ps1"),
     (Join-Path $remoteDirectory "Get-RemoteSystemInfo.ps1"),
-    (Join-Path $remoteDirectory "Show-RemoteSystemInfo.ps1")
+    (Join-Path $remoteDirectory "Show-RemoteSystemInfo.ps1"),
+    (Join-Path $remoteDirectory "Get-RemoteService.ps1"),
+    (Join-Path $remoteDirectory "Get-RemoteServiceStatus.ps1"),
+    (Join-Path $remoteDirectory "Invoke-RemoteServiceAction.ps1")
 )
 
 foreach ($file in $scriptFiles) {
@@ -357,6 +360,206 @@ function Invoke-RemoteSystemInfoMenuAction {
     }
 }
 
+
+# ============================================================
+# T15.3: Remote Service Management menu.
+# ============================================================
+function Show-RemoteServiceMenu {
+
+    while ($true) {
+
+        $choice = Show-Menu `
+            -Title 'REMOTE SERVICE MANAGEMENT' `
+            -Items @(
+                'List Services',
+                'Check Service Status',
+                'Start Service',
+                'Stop Service',
+                'Restart Service'
+            )
+
+        switch ($choice) {
+
+            "1" {
+                Invoke-DevOpsAction {
+
+                    $aliasName = Read-Host "SSH alias"
+
+                    if ([string]::IsNullOrWhiteSpace($aliasName)) {
+                        throw "SSH alias cannot be empty."
+                    }
+
+                    Write-Host ""
+                    Write-Host "Retrieving remote services..." `
+                        -ForegroundColor Yellow
+                    Write-Host ""
+
+                    $services = @(
+                        Get-RemoteService -HostAlias $aliasName
+                    )
+
+                    if ($services.Count -eq 0) {
+                        Write-DevOpsMessage `
+                            "No services found." `
+                            -Level WARN
+                    }
+                    else {
+                        $services |
+                            Sort-Object Name |
+                            Format-Table `
+                                Name,
+                                ActiveState,
+                                SubState `
+                                -AutoSize |
+                            Out-Host
+
+                        Write-Host ""
+                        Write-DevOpsMessage `
+                            "Retrieved $($services.Count) services." `
+                            -Level OK
+                    }
+                }
+            }
+
+            "2" {
+                Invoke-DevOpsAction {
+
+                    $aliasName = Read-Host "SSH alias"
+
+                    if ([string]::IsNullOrWhiteSpace($aliasName)) {
+                        throw "SSH alias cannot be empty."
+                    }
+
+                    $serviceName = Read-Host "Service name (e.g. ssh)"
+
+                    if ([string]::IsNullOrWhiteSpace($serviceName)) {
+                        throw "Service name cannot be empty."
+                    }
+
+                    Write-Host ""
+                    Write-Host "Retrieving service status..." `
+                        -ForegroundColor Yellow
+                    Write-Host ""
+
+                    $service = Get-RemoteServiceStatus `
+                        -HostAlias $aliasName `
+                        -ServiceName $serviceName
+
+                    Write-Host "SERVICE INFORMATION" `
+                        -ForegroundColor Cyan
+
+                    Write-Host "----------------------------------------" `
+                        -ForegroundColor DarkGray
+
+                    Write-Host ""
+
+                    $service |
+                        Format-List `
+                            HostAlias,
+                            Name,
+                            Description,
+                            LoadState,
+                            ActiveState,
+                            SubState,
+                            UnitFileState,
+                            MainPID,
+                            IsActive,
+                            IsRunning |
+                        Out-Host
+
+                    Write-DevOpsMessage `
+                        "Service status retrieved." `
+                        -Level OK
+                }
+            }
+
+            { $_ -in @("3", "4", "5") } {
+
+                $selectedAction = switch ($choice) {
+                    "3" { "Start" }
+                    "4" { "Stop" }
+                    "5" { "Restart" }
+                }
+
+                Invoke-DevOpsAction {
+
+                    $aliasName = Read-Host "SSH alias"
+
+                    if ([string]::IsNullOrWhiteSpace($aliasName)) {
+                        throw "SSH alias cannot be empty."
+                    }
+
+                    $serviceName = Read-Host "Service name"
+
+                    if ([string]::IsNullOrWhiteSpace($serviceName)) {
+                        throw "Service name cannot be empty."
+                    }
+
+                    Write-Host ""
+                    Write-Host "Requested action: $selectedAction" `
+                        -ForegroundColor Yellow
+
+                    Write-Host "SSH host: $aliasName"
+                    Write-Host "Service: $serviceName"
+                    Write-Host ""
+
+                    $confirmation = Read-Host "Type YES to confirm"
+
+                    if ($confirmation -ne "YES") {
+                        Write-Host "Action cancelled." `
+                            -ForegroundColor Yellow
+                        return
+                    }
+
+                    Write-Host ""
+                    Write-Host "Executing remote service action..." `
+                        -ForegroundColor Yellow
+
+                    $result = Invoke-RemoteServiceAction `
+                        -HostAlias $aliasName `
+                        -ServiceName $serviceName `
+                        -Action $selectedAction
+
+                    Write-Host ""
+                    Write-Host "SERVICE ACTION RESULT" `
+                        -ForegroundColor Cyan
+
+                    Write-Host "----------------------------------------" `
+                        -ForegroundColor DarkGray
+
+                    $result |
+                        Format-List `
+                            HostAlias,
+                            ServiceName,
+                            Action,
+                            Success,
+                            ExitCode,
+                            StatusVerified |
+                        Out-Host
+
+                    Write-DevOpsMessage `
+                        "Remote service action completed." `
+                        -Level OK
+
+                    if (-not $result.StatusVerified) {
+                        Write-DevOpsMessage $result.VerificationError -Level WARN
+                    }
+                }
+            }
+
+            "0" {
+                return
+            }
+
+            default {
+                Write-Host "Invalid option."
+                Wait-DevOpsInput
+            }
+        }
+    }
+}
+
+
 # STEP 9: Main application menu.
 function Start-DevOpsCLI {
 
@@ -368,7 +571,8 @@ function Start-DevOpsCLI {
                 'SSH Configuration',
                 'SSH Connection',
                 'SSH Key Management',
-                'Remote System Information'
+                'Remote System Information',
+                'Remote Service Management'
             ) `
             -Root `
             -Descriptions @(
@@ -376,7 +580,8 @@ function Start-DevOpsCLI {
                 'Manage SSH host settings',
                 'Connect to Linux servers',
                 'Manage SSH authentication keys',
-                'View Linux server system information'
+                'View Linux server system information',
+                'Inspect Linux services and their status'
             )
 
         switch ($choice) {
@@ -396,16 +601,16 @@ function Start-DevOpsCLI {
             "4" {
                 Show-SSHKeyMenu
             }
-
+            "5" {
+                Invoke-RemoteSystemInfoMenuAction
+            }
+            "6" {
+                Show-RemoteServiceMenu
+            }
             "0" {
                 Write-Host "Goodbye!"
                 return
             }
-
-            "5" {
-                Invoke-RemoteSystemInfoMenuAction
-            }
-
             default {
                 Write-Host "Invalid option."
                 Wait-DevOpsInput
